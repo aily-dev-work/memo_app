@@ -46,3 +46,7 @@ app.*.map.json
 # Isar generated files
 *.g.dart
 *.freezed.dart
+
+# Android build artifacts
+/android/.gradle/
+/android/app/build/
