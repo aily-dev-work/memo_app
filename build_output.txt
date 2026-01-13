@@ -1,0 +1,2 @@
+Running Gradle task 'assembleDebug'...                             856ms
+Gradle build failed to produce an .apk file. It's likely that this file was generated under /Users/yuki/dev/memo_app/build, but the tool couldn't find it.

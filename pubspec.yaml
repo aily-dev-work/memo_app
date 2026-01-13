@@ -1,0 +1,38 @@
+name: memo_app
+description: ジャンル→タブ→本文編集のメモ帳アプリ
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # 状態管理
+  flutter_riverpod: ^2.5.1
+  
+  # ルーティング
+  go_router: ^13.2.0
+  
+  # ローカル永続化
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
+  
+  # コード生成
+  isar_generator: ^3.1.0+1
+  build_runner: ^2.4.8
+  
+  # その他
+  uuid: ^4.3.3
+  intl: ^0.19.0
+  path_provider: ^2.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
