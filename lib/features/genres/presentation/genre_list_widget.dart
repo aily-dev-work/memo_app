@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:isar/isar.dart';
 import '../application/genre_providers.dart';
 import '../data/genre_repository_impl.dart';
 import '../domain/genre.dart';
 import '../../../shared/utils/undo_service.dart';
+import '../../../shared/ads/ad_banner_widget.dart';
 
 /// ジャンル一覧ウィジェット
 class GenreListWidget extends ConsumerStatefulWidget {
@@ -27,47 +29,111 @@ class _GenreListWidgetState extends ConsumerState<GenreListWidget> {
     final genresAsync = ref.watch(genresProvider);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFE8E6E1), // グレージュっぽい色
       appBar: AppBar(
-        title: const Text('ジャンル'),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: const Color(0xFFE8E6E1), // グレージュっぽい色
+        foregroundColor: Colors.grey.shade900,
+        title: const Text(
+          'LayerMemo',
+          style: TextStyle(
+            fontSize: 24.0,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+            fontFamily: 'SF Pro Display',
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
+            tooltip: '設定',
+            color: Colors.grey.shade700,
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
             onPressed: () => _showAddGenreDialog(context),
             tooltip: 'ジャンルを追加',
+            color: Colors.grey.shade700,
           ),
         ],
       ),
       body: genresAsync.when(
         data: (genres) {
           if (genres.isEmpty) {
-            return const Center(
-              child: Text('＋でジャンルを追加'),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.folder_outlined,
+                    size: 64,
+                    color: Colors.grey.shade300,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'ジャンルがありません',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('ジャンルを追加'),
+                    onPressed: () => _showAddGenreDialog(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             );
           }
 
-          return ReorderableListView.builder(
-            itemCount: genres.length,
-            onReorder: (oldIndex, newIndex) {
-              _handleReorder(genres, oldIndex, newIndex);
-            },
-            itemBuilder: (context, index) {
-              final genre = genres[index];
-              final isSelected = genre.id == widget.selectedGenreId;
+          return Column(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                  child: ReorderableListView.builder(
+                    itemCount: genres.length,
+                    onReorder: (oldIndex, newIndex) {
+                      _handleReorder(genres, oldIndex, newIndex);
+                    },
+                    itemBuilder: (context, index) {
+                      final genre = genres[index];
+                      final isSelected = genre.id == widget.selectedGenreId;
 
-              return _GenreListItem(
-                key: ValueKey(genre.id),
-                genre: genre,
-                isSelected: isSelected,
-                onTap: () => widget.onGenreSelected(genre.id),
-                onEdit: () => _showEditGenreDialog(context, genre),
-                onDelete: () => _showDeleteGenreDialog(context, genre),
-              );
-            },
+                      return _GenreListItem(
+                        key: ValueKey(genre.id),
+                        genre: genre,
+                        isSelected: isSelected,
+                        onTap: () => widget.onGenreSelected(genre.id),
+                        onEdit: () => _showEditGenreDialog(context, genre),
+                        onDelete: () => _showDeleteGenreDialog(context, genre),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              // 広告バナー（編集画面以外）
+              const AdBannerWidget(),
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
-          child: Text('エラー: $error'),
+          child: Text(
+            'エラー: $error',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
         ),
       ),
     );
@@ -276,25 +342,76 @@ class _GenreListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      selected: isSelected,
-      title: Text(genre.name),
-      onTap: onTap,
-      trailing: PopupMenuButton(
-        itemBuilder: (context) => [
-          const PopupMenuItem(
-            value: 'edit',
-            child: Text('名前を変更'),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.zero,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.grey.shade50 : Colors.white,
+            borderRadius: BorderRadius.zero,
+            border: Border.all(
+              color: isSelected 
+                  ? Colors.grey.shade300 
+                  : Colors.grey.shade200,
+              width: 1.0,
+            ),
           ),
-          const PopupMenuItem(
-            value: 'delete',
-            child: Text('削除'),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  genre.name,
+                  style: TextStyle(
+                    fontSize: 17.0,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: Colors.grey.shade900,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.more_vert,
+                  size: 20,
+                  color: Colors.grey.shade400,
+                ),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.zero,
+                ),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 20),
+                        SizedBox(width: 12),
+                        Text('名前を変更'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                        SizedBox(width: 12),
+                        Text('削除', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+                onSelected: (value) {
+                  if (value == 'edit') onEdit();
+                  if (value == 'delete') onDelete();
+                },
+              ),
+            ],
           ),
-        ],
-        onSelected: (value) {
-          if (value == 'edit') onEdit();
-          if (value == 'delete') onDelete();
-        },
+        ),
       ),
     );
   }

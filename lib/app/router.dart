@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/genres/presentation/genre_list_screen.dart';
 import '../features/memos/presentation/genre_detail_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
 import '../shared/breakpoints.dart';
 
 /// ルーターのProvider
@@ -20,6 +21,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           final genreId = int.parse(state.pathParameters['genreId']!);
           return GenreDetailScreen(genreId: genreId);
         },
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );

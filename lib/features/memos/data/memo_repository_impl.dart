@@ -17,7 +17,8 @@ class MemoRepository {
         .genreIdEqualTo(genreId)
         .sortBySortOrder()
         .findAll();
-    return schemas.map((s) => s.toDomain()).toList();
+    final memos = schemas.map((s) => s.toDomain()).toList();
+    return memos;
   }
 
   /// IDでメモを取得
@@ -31,6 +32,7 @@ class MemoRepository {
     required int genreId,
     required String title,
     required String content,
+    int? colorValue,
   }) async {
     final now = DateTime.now();
     final memos = await getByGenreId(genreId);
@@ -45,7 +47,8 @@ class MemoRepository {
       ..sortOrder = maxSortOrder + 1
       ..createdAt = now
       ..updatedAt = now
-      ..lastOpenedAt = now;
+      ..lastOpenedAt = now
+      ..colorValue = colorValue;
 
     await _isar.writeTxn(() async {
       await _isar.memoSchemas.put(schema);

@@ -58,14 +58,6 @@ class _MemoTabBarViewState extends ConsumerState<MemoTabBarView> {
           onControllerCreated: (controller) {
             widget.onContentControllerCreated(memo.id, controller);
           },
-          onFocusNodeCreated: (focusNode) {
-            if (memo.id == widget.selectedMemoId && memo.content.isEmpty) {
-              // 新規メモの場合、フォーカス
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                focusNode.requestFocus();
-              });
-            }
-          },
         );
       }).toList(),
     );

@@ -23,6 +23,9 @@ class MemoSchema {
   
   DateTime? lastOpenedAt;
   
+  /// タブ／メモのカラー（ARGB値をintで保持）
+  int? colorValue;
+  
   /// 無名コンストラクタ（Isar必須）
   MemoSchema();
   
@@ -37,6 +40,7 @@ class MemoSchema {
       createdAt: createdAt,
       updatedAt: updatedAt,
       lastOpenedAt: lastOpenedAt,
+      colorValue: colorValue,
     );
   }
   
@@ -50,6 +54,7 @@ class MemoSchema {
       ..sortOrder = memo.sortOrder
       ..createdAt = memo.createdAt
       ..updatedAt = memo.updatedAt
-      ..lastOpenedAt = memo.lastOpenedAt;
+      ..lastOpenedAt = memo.lastOpenedAt
+      ..colorValue = memo.colorValue;
   }
 }

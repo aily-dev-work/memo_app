@@ -10,6 +10,8 @@ class Memo {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? lastOpenedAt;
+  /// タブ／メモのカラー（ARGB値をintで保持）
+  final int? colorValue;
 
   Memo({
     required this.id,
@@ -20,6 +22,7 @@ class Memo {
     required this.createdAt,
     required this.updatedAt,
     this.lastOpenedAt,
+    this.colorValue,
   });
 
   Memo copyWith({
@@ -31,6 +34,7 @@ class Memo {
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? lastOpenedAt,
+    int? colorValue,
   }) {
     return Memo(
       id: id ?? this.id,
@@ -41,6 +45,7 @@ class Memo {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
+      colorValue: colorValue ?? this.colorValue,
     );
   }
 }

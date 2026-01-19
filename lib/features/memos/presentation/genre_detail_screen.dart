@@ -4,11 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:isar/isar.dart';
 import '../../../shared/breakpoints.dart';
 import '../../genres/application/genre_providers.dart';
+import '../../genres/data/genre_repository_impl.dart';
 import '../../genres/domain/genre.dart';
 import '../application/memo_providers.dart';
 import '../data/memo_repository_impl.dart';
 import '../domain/memo.dart';
 import '../../../shared/utils/undo_service.dart';
+import '../../../shared/ads/ad_banner_widget.dart';
 import 'memo_tab_bar_view.dart';
 import 'memo_search_bar.dart';
 
@@ -49,6 +51,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
   Future<void> _initializeLastOpenedMemo() async {
     if (!mounted) return;
     
+    // initState/postFrame内では ref.read を使用（ref.watch禁止）
     final memosAsync = ref.read(memosByGenreProvider(widget.genreId));
     final memos = memosAsync.value ?? [];
     
@@ -92,6 +95,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // build内でのみ ref.watch を使用
     final memosAsync = ref.watch(filteredMemosProvider(widget.genreId));
     final selectedMemoId = ref.watch(selectedMemoIdProvider);
     final genreAsync = ref.watch(genresProvider);
@@ -102,10 +106,13 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
           // メモが0件の場合はDefaultTabControllerなしで空状態UIを表示
           return Scaffold(
             appBar: AppBar(
+              elevation: 0,
+              scrolledUnderElevation: 0,
               leading: _shouldShowBackButton(context)
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => context.pop(),
+                      color: Colors.grey.shade700,
                     )
                   : null,
               title: genreAsync.when(
@@ -114,17 +121,27 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
                     (g) => g.id == widget.genreId,
                     orElse: () => genres.first,
                   );
-                  return Text(genre.name);
+                  return Text(
+                    genre.name,
+                    style: const TextStyle(
+                      fontSize: 20.0,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
+                  );
                 },
                 loading: () => const Text(''),
                 error: (_, __) => const Text(''),
               ),
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.grey.shade900,
               actions: [
                 const MemoSearchBar(),
                 IconButton(
                   icon: const Icon(Icons.add),
                   onPressed: () => _handleAddMemo(),
                   tooltip: 'メモを追加',
+                  color: Colors.grey.shade700,
                 ),
               ],
             ),
@@ -135,6 +152,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
         }
 
         // メモがある場合はDefaultTabControllerでラップ
+        // ValueKey(memos.length) により、memos.lengthが変わったときのみ再作成される
         final initialIndex = _calculateInitialIndex(memos, selectedMemoId);
         
         return DefaultTabController(
@@ -208,11 +226,132 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
     if (!mounted) return;
     
     try {
+      // まずタブ名称入力ダイアログを表示
+      final controller = TextEditingController();
+      final title = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('タブの名称を入力'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'タブ名',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('追加'),
+            ),
+          ],
+        ),
+      );
+      
+      // キャンセルまたは空文字の場合は何もしない
+      if (!mounted || title == null || title.isEmpty) {
+        return;
+      }
+      
+      // 続いてカラー選択ダイアログを表示
+      final selectedColor = await showDialog<Color>(
+        context: context,
+        builder: (context) {
+          final colors = <Color>[
+            // イエロー系
+            const Color(0xFFFFF9C4), // 明るいイエロー
+            const Color(0xFFFFF59D), // レモンイエロー
+            const Color(0xFFFFF176), // サンイエロー
+            const Color(0xFFFFFDE7), // クリーム
+            // オレンジ系
+            const Color(0xFFFFE0B2), // オレンジ
+            const Color(0xFFFFCCBC), // ピーチ
+            const Color(0xFFFFE5B4), // アプリコット
+            // ピンク系
+            const Color(0xFFFFCDD2), // ピンク
+            const Color(0xFFF8BBD0), // ローズピンク
+            const Color(0xFFFFE1F5), // ライトピンク
+            // パープル系
+            const Color(0xFFD1C4E9), // パープル
+            const Color(0xFFE1BEE7), // ラベンダー
+            const Color(0xFFF3E5F5), // ライトパープル
+            // ブルー系
+            const Color(0xFFB3E5FC), // 水色
+            const Color(0xFFBBDEFB), // スカイブルー
+            const Color(0xFFC5CAE9), // ペールブルー
+            const Color(0xFFE3F2FD), // ライトブルー
+            // グリーン系
+            const Color(0xFFC8E6C9), // グリーン
+            const Color(0xFFDCEDC8), // ライムグリーン
+            const Color(0xFFE8F5E9), // ミントグリーン
+            // クールな色（男性向け）
+            const Color(0xFF90CAF9), // コバルトブルー
+            const Color(0xFF64B5F6), // ブライトブルー
+            const Color(0xFF81C784), // エメラルドグリーン
+            const Color(0xFFA5D6A7), // セージグリーン
+            const Color(0xFFB0BEC5), // スレートグレー
+            const Color(0xFF90A4AE), // ブルーグレー
+            const Color(0xFF78909C), // チャコールグレー
+            const Color(0xFF9E9E9E), // ミディアムグレー
+            const Color(0xFF607D8B), // ブルーグレー（ダーク）
+            const Color(0xFF546E7A), // スチールブルー
+            const Color(0xFF455A64), // ダークスレート
+            const Color(0xFF37474F), // ダークブルーグレー
+            // その他
+            const Color(0xFFCFD8DC), // ブルーグレー
+            const Color(0xFFE0E0E0), // ライトグレー
+            const Color(0xFFFFF3E0), // ベージュ
+          ];
+          return AlertDialog(
+            title: const Text('カラーを選択'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.center,
+                  children: colors.map((color) {
+                    return GestureDetector(
+                      onTap: () => Navigator.pop(context, color),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+      
+      // カラー未選択の場合はデフォルトカラーを使用
+      final colorToSave = selectedColor ?? const Color(0xFFFFF9C4);
+      
+      // 色の値をそのまま保存（Color.valueは既に0xAARRGGBB形式）
+      final colorValue = colorToSave.value;
+      
+      // 非同期処理では ref.read を使用
       final repository = ref.read(memoRepositoryProvider);
       final memoId = await repository.create(
         genreId: widget.genreId,
-        title: '',
+        title: title,
         content: '',
+        colorValue: colorValue,
       );
       
       if (!mounted) return;
@@ -220,15 +359,6 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
       ref.invalidate(memosByGenreProvider(widget.genreId));
       ref.invalidate(filteredMemosProvider(widget.genreId));
       ref.read(selectedMemoIdProvider.notifier).state = memoId;
-      
-      // 新規メモをアクティブにして本文へフォーカス
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final controller = _contentControllers[memoId];
-        if (controller != null) {
-          // フォーカスはMemoTabBarView内で処理
-        }
-      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -299,6 +429,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
 
     if (result != null) {
       try {
+        // 非同期処理では ref.read を使用
         final repository = ref.read(memoRepositoryProvider);
         await repository.update(memo.copyWith(title: result));
         ref.invalidate(memosByGenreProvider(widget.genreId));
@@ -337,6 +468,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
 
     if (result == true) {
       try {
+        // 非同期処理では ref.read を使用
         final repository = ref.read(memoRepositoryProvider);
         final memos = await repository.getByGenreId(widget.genreId);
         final currentIndex = memos.indexWhere((m) => m.id == memo.id);
@@ -390,6 +522,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
     if (!mounted) return;
     
     try {
+      // 非同期処理では ref.read を使用
       final repository = ref.read(memoRepositoryProvider);
       await repository.restore(memo);
       ref.invalidate(memosByGenreProvider(widget.genreId));
@@ -415,6 +548,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
     if (!mounted) return;
     
     try {
+      // 非同期処理では ref.read を使用
       final repository = ref.read(memoRepositoryProvider);
       await repository.updateLastOpenedAt(memoId);
     } catch (e) {
@@ -423,7 +557,12 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
   }
 }
 
-/// TabControllerのラッパー（Builderの代わりにStatefulWidgetを使用）
+/// TabControllerのラッパー（DefaultTabControllerの子として使用）
+/// 
+/// このWidgetは以下の条件で再構築される：
+/// - memos.length が変わったとき（DefaultTabControllerがValueKeyで再作成される）
+/// - selectedMemoId が変わったとき（didUpdateWidgetで検知）
+/// - memos の内容が変わったとき（親のbuildで検知）
 class _TabControllerWrapper extends StatefulWidget {
   final List<Memo> memos;
   final Id? selectedMemoId;
@@ -457,86 +596,372 @@ class _TabControllerWrapper extends StatefulWidget {
 }
 
 class _TabControllerWrapperState extends State<_TabControllerWrapper> {
+  // 前回のselectedMemoIdを保持（didUpdateWidgetで変更検知用）
+  Id? _previousSelectedMemoId;
+  TabController? _tabController;
+  VoidCallback? _tabControllerListener;
+
   @override
   void initState() {
     super.initState();
+    _previousSelectedMemoId = widget.selectedMemoId;
+    
+    // initState後のpostFrameで初期同期
+    // 条件: 初回構築時のみ実行
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncTabController();
+      _setupTabControllerListener();
     });
   }
 
   @override
   void didUpdateWidget(_TabControllerWrapper oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedMemoId != widget.selectedMemoId ||
-        oldWidget.memos.length != widget.memos.length) {
+    
+    // _syncTabController が走る条件:
+    // 1. selectedMemoId が変わったとき（タブを切り替える必要がある）
+    // 2. memos.length が変わったときは DefaultTabController が再作成されるため、
+    //    このWidget自体が再構築される（initStateが呼ばれる）のでここでは処理しない
+    final selectedMemoIdChanged = oldWidget.selectedMemoId != widget.selectedMemoId;
+    
+    if (selectedMemoIdChanged) {
+      _previousSelectedMemoId = widget.selectedMemoId;
+      // タブ切り替え時にSnackBarを消す
+      _hideSnackBar();
+      // postFrameで実行（build中にTabControllerを操作しない）
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _syncTabController();
-        }
+        if (!mounted) return;
+        _syncTabController();
       });
     }
   }
 
+  /// TabControllerのリスナーを設定（タブ切り替え時にSnackBarを消す）
+  void _setupTabControllerListener() {
+    if (!mounted) return;
+    
+    try {
+      final tabController = DefaultTabController.of(context);
+      if (tabController == _tabController) return; // 既に設定済み
+      
+      // 前のリスナーを削除
+      if (_tabController != null && _tabControllerListener != null) {
+        _tabController!.removeListener(_tabControllerListener!);
+      }
+      
+      _tabController = tabController;
+      int? previousIndex = tabController.index;
+      _tabControllerListener = () {
+        // タブが実際に切り替わった時のみSnackBarを消す
+        if (tabController.index != previousIndex) {
+          previousIndex = tabController.index;
+          _hideSnackBar();
+        }
+      };
+      tabController.addListener(_tabControllerListener!);
+    } catch (e) {
+      // DefaultTabControllerが見つからない場合は無視
+    }
+  }
+
+  /// SnackBarを非表示にする
+  void _hideSnackBar() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  }
+
+  @override
+  void dispose() {
+    // リスナーを削除
+    if (_tabController != null && _tabControllerListener != null) {
+      _tabController!.removeListener(_tabControllerListener!);
+    }
+    super.dispose();
+  }
+
+  /// TabControllerを選択されたメモに同期
+  /// 
+  /// 実行条件:
+  /// - initState後のpostFrame（初回構築時）
+  /// - didUpdateWidgetでselectedMemoIdが変わったときのpostFrame
+  /// 
+  /// 注意: build内では呼ばない（TabController操作はpostFrameで行う）
   void _syncTabController() {
     if (!mounted) return;
-    final tabController = DefaultTabController.of(context);
-    if (widget.selectedMemoId != null) {
-      final index = widget.memos.indexWhere((m) => m.id == widget.selectedMemoId);
-      if (index >= 0 && index < widget.memos.length && tabController.index != index) {
-        tabController.animateTo(index);
+    
+    try {
+      final tabController = DefaultTabController.of(context);
+      if (!mounted) return;
+      
+      // TabControllerが変わった場合はリスナーを再設定
+      if (tabController != _tabController) {
+        _setupTabControllerListener();
       }
+      
+      if (widget.selectedMemoId != null) {
+        final index = widget.memos.indexWhere((m) => m.id == widget.selectedMemoId);
+        if (index >= 0 && index < widget.memos.length) {
+          // TabControllerのindexが現在の選択と異なる場合のみ同期
+          if (tabController.index != index) {
+            tabController.animateTo(index);
+          }
+        }
+      }
+    } catch (e) {
+      // DefaultTabControllerが見つからない場合（Widgetツリー外など）は無視
+      // mountedチェックでdispose後の操作は防げるが、念のためtry-catch
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // build内ではTabControllerを操作しない
+    // DefaultTabControllerは親のValueKey(memos.length)で管理されるため、
+    // memos.lengthが変わったときのみ再作成される
+    
     return Scaffold(
       appBar: AppBar(
-        leading: widget.shouldShowBackButton
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: widget.onPop,
-              )
-            : null,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () {
+              // ハンバーガーメニューを開く時にSnackBarを消す
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              Scaffold.of(context).openDrawer();
+            },
+            color: Colors.grey.shade700,
+          ),
+        ),
         title: widget.genreAsync.when(
           data: (genres) {
             final genre = genres.firstWhere(
               (g) => g.id == widget.genreId,
               orElse: () => genres.first,
             );
-            return Text(genre.name);
+            return Text(
+              genre.name,
+              style: const TextStyle(
+                fontSize: 20.0,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+            );
           },
           loading: () => const Text(''),
           error: (_, __) => const Text(''),
         ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.grey.shade900,
         actions: [
           const MemoSearchBar(),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
+            tooltip: '設定',
+            color: Colors.grey.shade700,
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: widget.onAddMemo,
             tooltip: 'メモを追加',
+            color: Colors.grey.shade700,
           ),
         ],
-        bottom: TabBar(
-          isScrollable: true,
-          tabs: widget.memos.map((memo) => _MemoTab(
-            memo: memo,
-            onLongPress: () => widget.onShowMemoMenu(context, memo),
-          )).toList(),
-          onTap: (index) {
-            widget.onTabChanged(index, widget.memos);
-          },
-        ),
       ),
-      body: MemoTabBarView(
-        genreId: widget.genreId,
-        memos: widget.memos,
-        selectedMemoId: widget.selectedMemoId,
-        contentControllers: widget.contentControllers,
-        onContentControllerCreated: widget.onContentControllerCreated,
+      drawer: _GenreDrawer(
+        currentGenreId: widget.genreId,
+        onGenreSelected: (genreId) {
+          Navigator.pop(context);
+          // Drawer操作時にSnackBarを消す
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          if (genreId != widget.genreId) {
+            context.push('/genre/$genreId');
+          }
+        },
       ),
+      onDrawerChanged: (isOpened) {
+        // Drawerが開閉した時にSnackBarを消す
+        if (isOpened) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        }
+      },
+      body: Builder(
+        builder: (context) {
+          final tabController = DefaultTabController.of(context);
+          return AnimatedBuilder(
+            animation: tabController,
+            builder: (context, child) {
+              final selectedIndex = tabController.index;
+              final selectedMemo = selectedIndex >= 0 && selectedIndex < widget.memos.length
+                  ? widget.memos[selectedIndex]
+                  : null;
+              final selectedColor = selectedMemo != null
+                  ? (selectedMemo.colorValue != null
+                      ? Color(selectedMemo.colorValue!)
+                      : _MemoTab.getMemoColor(selectedMemo, selected: true))
+                  : Colors.white;
+
+              return Column(
+                children: [
+                  _CustomTabBar(
+                    memos: widget.memos,
+                    selectedMemoId: widget.selectedMemoId,
+                    onTabChanged: (index) {
+                      // タブ切り替え時にSnackBarを消す
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      widget.onTabChanged(index, widget.memos);
+                    },
+                    onLongPress: (memo) {
+                      widget.onShowMemoMenu(context, memo);
+                    },
+                  ),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: selectedColor,
+                        borderRadius: BorderRadius.zero,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.zero,
+                        child: MemoTabBarView(
+                          genreId: widget.genreId,
+                          memos: widget.memos,
+                          selectedMemoId: widget.selectedMemoId,
+                          contentControllers: widget.contentControllers,
+                          onContentControllerCreated: widget.onContentControllerCreated,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 広告バナー（編集画面の外、画面下部）
+                  const AdBannerWidget(),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// カスタムタブバー（各タブに色を付ける）
+class _CustomTabBar extends StatelessWidget implements PreferredSizeWidget {
+  final List<Memo> memos;
+  final Id? selectedMemoId;
+  final void Function(int index) onTabChanged;
+  final void Function(Memo memo) onLongPress;
+
+  const _CustomTabBar({
+    required this.memos,
+    required this.selectedMemoId,
+    required this.onTabChanged,
+    required this.onLongPress,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(60.0);
+
+  @override
+  Widget build(BuildContext context) {
+    final tabController = DefaultTabController.of(context);
+    
+    // TabControllerの変更を監視
+    return _ScrollableTabBar(
+      tabController: tabController,
+      memos: memos,
+      onTabChanged: onTabChanged,
+      onLongPress: onLongPress,
+    );
+  }
+}
+
+/// 選択タブを左端にスクロールするための内部ウィジェット
+class _ScrollableTabBar extends StatefulWidget {
+  final TabController tabController;
+  final List<Memo> memos;
+  final void Function(int index) onTabChanged;
+  final void Function(Memo memo) onLongPress;
+
+  const _ScrollableTabBar({
+    required this.tabController,
+    required this.memos,
+    required this.onTabChanged,
+    required this.onLongPress,
+  });
+
+  @override
+  State<_ScrollableTabBar> createState() => _ScrollableTabBarState();
+}
+
+class _ScrollableTabBarState extends State<_ScrollableTabBar> {
+  final ScrollController _scrollController = ScrollController();
+  int _lastIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastIndex = widget.tabController.index;
+  }
+
+  void _scrollToIndex(int index) {
+    if (!_scrollController.hasClients) return;
+    const estimatedTabWidth = 160.0 + 12.0; // タブ最大幅＋左右マージンのざっくりした幅
+    final target = (index * estimatedTabWidth)
+        .clamp(0.0, _scrollController.position.maxScrollExtent);
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.tabController,
+      builder: (context, child) {
+        final currentIndex = widget.tabController.index;
+        if (currentIndex != _lastIndex) {
+          _lastIndex = currentIndex;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _scrollToIndex(currentIndex);
+          });
+        }
+
+        return Container(
+          height: 60.0, // タブバーの高さを少し高めにしてテキストの余白を確保
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              bottom: BorderSide(
+                color: Colors.grey.shade100,
+                width: 1.0,
+              ),
+            ),
+          ),
+          child: ListView.builder(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemExtent: null,
+            itemCount: widget.memos.length,
+            itemBuilder: (context, index) {
+              final memo = widget.memos[index];
+              final isSelected = widget.tabController.index == index;
+              return _MemoTab(
+                memo: memo,
+                isSelected: isSelected,
+                onTap: () => widget.onTabChanged(index),
+                onLongPress: () => widget.onLongPress(memo),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -544,12 +969,32 @@ class _TabControllerWrapperState extends State<_TabControllerWrapper> {
 /// メモタブウィジェット
 class _MemoTab extends StatelessWidget {
   final Memo memo;
+  final bool isSelected;
+  final VoidCallback onTap;
   final VoidCallback onLongPress;
 
   const _MemoTab({
     required this.memo,
+    required this.isSelected,
+    required this.onTap,
     required this.onLongPress,
   });
+
+  /// メモのカラー（タブ／本文背景）を取得
+  ///
+  /// - colorValue が設定されていればその色を使う
+  /// - 未設定の場合はメモIDから淡い色を生成
+  static Color getMemoColor(Memo memo, {bool selected = false}) {
+    if (memo.colorValue != null) {
+      // 保存された色をそのまま返す（不透明度は変更しない）
+      return Color(memo.colorValue!);
+    }
+    // 既存メモとの互換性用（IDから色を生成）
+    final hash = memo.id.hashCode;
+    final hue = (hash % 360).abs().toDouble();
+    final base = HSVColor.fromAHSV(1.0, hue, 0.15, 0.98).toColor();
+    return selected ? base.withOpacity(0.6) : base;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -559,11 +1004,245 @@ class _MemoTab extends StatelessWidget {
             : '無題')
         : memo.title;
 
+    // 選択時は濃い色、非選択時は淡い色（メモ）
+    final backgroundColor = _MemoTab.getMemoColor(memo, selected: isSelected);
+    
+    final textColor = isSelected
+        ? Colors.grey.shade900 // 選択時は濃いグレー
+        : Colors.grey.shade700; // 非選択時はダークグレー
+
     return GestureDetector(
+      onTap: onTap,
       onLongPress: onLongPress,
-      child: Tab(
-        text: title,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        constraints: const BoxConstraints(
+          minWidth: 80.0, // タブの最小幅を統一（小さく）
+          maxWidth: 160.0, // タブの最大幅を設定（少し広げる）
+        ),
+        margin: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.zero,
+        ),
+        child: Center(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 14.0,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              letterSpacing: 0.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ),
     );
   }
 }
+
+/// ジャンル一覧Drawer
+class _GenreDrawer extends ConsumerWidget {
+  final Id currentGenreId;
+  final void Function(Id genreId) onGenreSelected;
+
+  const _GenreDrawer({
+    required this.currentGenreId,
+    required this.onGenreSelected,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final genresAsync = ref.watch(genresProvider);
+    final theme = Theme.of(context);
+
+    return Drawer(
+      backgroundColor: Colors.grey.shade800, // 落ち着いたグレー色
+      child: SafeArea(
+        child: Column(
+          children: [
+            // ヘッダー
+            Container(
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
+                children: [
+                  const Text(
+                    'LayerMemo',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20.0,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white54, height: 1),
+            // ホームボタン
+            _HomeButtonInDrawer(),
+            const Divider(color: Colors.white54, height: 1),
+            // ジャンル一覧
+            Expanded(
+              child: genresAsync.when(
+                data: (genres) {
+                  if (genres.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'ジャンルがありません',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    itemCount: genres.length,
+                    itemBuilder: (context, index) {
+                      final genre = genres[index];
+                      final isSelected = genre.id == currentGenreId;
+                      return _GenreDrawerItem(
+                        genre: genre,
+                        isSelected: isSelected,
+                        onTap: () => onGenreSelected(genre.id),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+                error: (error, stack) => Center(
+                  child: Text(
+                    'エラー: $error',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddGenreDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ジャンルを追加'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'ジャンル名',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('追加'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      try {
+        final repository = ref.read(genreRepositoryProvider);
+        final genreId = await repository.create(result);
+        ref.invalidate(genresProvider);
+        onGenreSelected(genreId);
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('エラー: $e')),
+          );
+        }
+      }
+    }
+  }
+}
+
+/// Drawer内のジャンルアイテム
+class _GenreDrawerItem extends StatelessWidget {
+  final Genre genre;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _GenreDrawerItem({
+    required this.genre,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.zero,
+      ),
+      child: ListTile(
+        title: Text(
+          genre.name,
+          style: TextStyle(
+            color: isSelected ? Colors.grey.shade900 : Colors.white,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 16.0,
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Drawer内のホームボタン
+class _HomeButtonInDrawer extends StatelessWidget {
+  const _HomeButtonInDrawer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.zero,
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.home_outlined, color: Colors.white, size: 24),
+        title: const Text(
+          'ホーム',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16.0,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        onTap: () {
+          Navigator.pop(context); // Drawerを閉じる
+          context.go('/'); // ジャンル一覧画面に遷移
+        },
+      ),
+    );
+  }
+}
+

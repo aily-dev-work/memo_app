@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:isar/isar.dart';
 import '../../../shared/breakpoints.dart';
 import '../../../shared/utils/undo_service.dart';
+import '../../../shared/ads/ad_banner_widget.dart';
 import '../application/genre_providers.dart';
 import '../data/genre_repository_impl.dart';
 import '../domain/genre.dart';
@@ -104,26 +105,32 @@ class _CollapsibleSidebarState extends ConsumerState<_CollapsibleSidebar> {
           // ヘッダー（開閉ボタン）
           Container(
             height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 if (isOpen) ...[
                   Expanded(
                     child: Text(
-                      'Genres',
+                      'LayerMemo',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
+                        letterSpacing: 1.2,
+                        fontSize: 18,
                       ),
                     ),
                   ),
                 ],
                 IconButton(
-                  icon: Icon(isOpen ? Icons.chevron_left : Icons.menu),
+                  icon: Icon(
+                    isOpen ? Icons.chevron_left : Icons.menu,
+                    size: 24,
+                  ),
                   onPressed: () {
                     ref.read(sidebarOpenProvider.notifier).state = !isOpen;
                   },
                   tooltip: isOpen ? 'サイドバーを閉じる' : 'サイドバーを開く',
+                  color: Colors.grey.shade700,
                 ),
               ],
             ),
@@ -373,7 +380,6 @@ class _SidebarGenreItem extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final firstChar = genre.name.isNotEmpty ? genre.name[0].toUpperCase() : '?';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -381,55 +387,31 @@ class _SidebarGenreItem extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.zero,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: EdgeInsets.symmetric(
-              horizontal: isOpen ? 12 : 0,
+              horizontal: isOpen ? 16 : 0,
               vertical: 12,
             ),
             decoration: BoxDecoration(
               color: isSelected
-                  ? colorScheme.primaryContainer
+                  ? Colors.grey.shade100
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.zero,
             ),
             child: isOpen
                 ? Row(
                     children: [
-                      // アイコン（頭文字）
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? colorScheme.primary
-                              : colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Text(
-                            firstChar,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: isSelected
-                                  ? colorScheme.onPrimary
-                                  : colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           genre.name,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: isSelected
-                                ? colorScheme.onPrimaryContainer
-                                : colorScheme.onSurface,
+                            color: colorScheme.onSurface,
                             fontWeight: isSelected
                                 ? FontWeight.w600
                                 : FontWeight.normal,
+                            letterSpacing: 0.1,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -439,18 +421,19 @@ class _SidebarGenreItem extends ConsumerWidget {
                       PopupMenuButton<String>(
                         icon: Icon(
                           Icons.more_vert,
-                          size: 20,
-                          color: isSelected
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurfaceVariant,
+                          size: 18,
+                          color: Colors.grey.shade400,
+                        ),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
                         ),
                         itemBuilder: (context) => [
                           const PopupMenuItem(
                             value: 'edit',
                             child: Row(
                               children: [
-                                Icon(Icons.edit, size: 20),
-                                SizedBox(width: 8),
+                                Icon(Icons.edit_outlined, size: 20),
+                                SizedBox(width: 12),
                                 Text('名前を変更'),
                               ],
                             ),
@@ -459,8 +442,8 @@ class _SidebarGenreItem extends ConsumerWidget {
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete, size: 20, color: Colors.red),
-                                SizedBox(width: 8),
+                                Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                SizedBox(width: 12),
                                 Text('削除', style: TextStyle(color: Colors.red)),
                               ],
                             ),
@@ -478,24 +461,20 @@ class _SidebarGenreItem extends ConsumerWidget {
                   )
                 : Center(
                     child: Container(
-                      width: 40,
-                      height: 40,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(10),
+                            ? Colors.grey.shade200
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.zero,
                       ),
-                      child: Center(
-                        child: Text(
-                          firstChar,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: isSelected
-                                ? colorScheme.onPrimaryContainer
-                                : colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                      child: Icon(
+                        Icons.folder_outlined,
+                        size: 18,
+                        color: isSelected
+                            ? Colors.grey.shade700
+                            : Colors.grey.shade500,
                       ),
                     ),
                   ),
@@ -523,7 +502,7 @@ class _AddGenreButton extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _showAddGenreDialog(context, ref),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.zero,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: EdgeInsets.symmetric(
@@ -532,34 +511,34 @@ class _AddGenreButton extends ConsumerWidget {
             ),
             decoration: BoxDecoration(
               border: Border.all(
-                color: colorScheme.outlineVariant,
-                width: 1.5,
+                color: Colors.grey.shade300,
+                width: 1.0,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.zero,
             ),
             child: isOpen
                 ? Row(
                     children: [
                       Icon(
-                        Icons.add,
+                        Icons.add_circle_outline,
                         size: 20,
-                        color: colorScheme.primary,
+                        color: Colors.grey.shade700,
                       ),
                       const SizedBox(width: 12),
                       Text(
                         'ジャンルを追加',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.normal,
                         ),
                       ),
                     ],
                   )
                 : Center(
                     child: Icon(
-                      Icons.add,
-                      size: 24,
-                      color: colorScheme.primary,
+                      Icons.add_circle_outline,
+                      size: 22,
+                      color: Colors.grey.shade600,
                     ),
                   ),
           ),
