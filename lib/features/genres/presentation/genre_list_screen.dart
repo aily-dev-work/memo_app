@@ -580,10 +580,9 @@ class _AddGenreButton extends ConsumerWidget {
     if (result != null && result.isNotEmpty) {
       try {
         final repository = ref.read(genreRepositoryProvider);
-        final genreId = await repository.create(result);
+        await repository.create(result);
         ref.invalidate(genresProvider);
-        // 追加したジャンルを選択
-        ref.read(selectedGenreIdProvider.notifier).state = genreId;
+        // ジャンルトップ（一覧）に留まる。追加したジャンルへは飛ばない。
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -68,8 +68,15 @@ class MemoRepository {
   }
 
   /// メモを復元（Undo用）
+  ///
+  /// sortOrder は同一ジャンル内の最大値+1にし、並び替え後のリストとの衝突を防ぐ。
   Future<void> restore(Memo memo) async {
-    final schema = MemoSchema.fromDomain(memo);
+    final memos = await getByGenreId(memo.genreId);
+    final maxOrder = memos.isEmpty
+        ? 0
+        : memos.map((m) => m.sortOrder).reduce((a, b) => a > b ? a : b);
+    final toPut = memo.copyWith(sortOrder: maxOrder + 1);
+    final schema = MemoSchema.fromDomain(toPut);
     await _isar.writeTxn(() async {
       await _isar.memoSchemas.put(schema);
     });

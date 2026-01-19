@@ -168,9 +168,9 @@ class _GenreListWidgetState extends ConsumerState<GenreListWidget> {
     if (result != null && result.isNotEmpty) {
       try {
         final repository = ref.read(genreRepositoryProvider);
-        final genreId = await repository.create(result);
+        await repository.create(result);
         ref.invalidate(genresProvider);
-        widget.onGenreSelected(genreId);
+        // ジャンルトップ（一覧）に留まる。追加したジャンルへは飛ばない。
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

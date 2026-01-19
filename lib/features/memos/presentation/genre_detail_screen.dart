@@ -150,28 +150,91 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
           );
         }
 
-        // メモがある場合はDefaultTabControllerでラップ
-        // ValueKey(memos.length) により、memos.lengthが変わったときのみ再作成される
+        // メモがある場合: Scaffold を外側に置き、メモ削除で DefaultTabController が
+        // 作り直されても Scaffold が残るようにする（SnackBar「元に戻す」が消えないため）
         final initialIndex = _calculateInitialIndex(memos, selectedMemoId);
-        
-        return DefaultTabController(
-          key: ValueKey(memos.length),
-          length: memos.length,
-          initialIndex: initialIndex,
-          child: _TabControllerWrapper(
-            memos: memos,
-            selectedMemoId: selectedMemoId,
-            genreId: widget.genreId,
-            genreAsync: genreAsync,
-            contentControllers: _contentControllers,
-            onContentControllerCreated: (memoId, controller) {
-              _contentControllers[memoId] = controller;
+
+        return Scaffold(
+          appBar: AppBar(
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: () {
+                  ScaffoldMessenger.of(ctx).hideCurrentSnackBar();
+                  Scaffold.of(ctx).openDrawer();
+                },
+                color: Colors.grey.shade700,
+              ),
+            ),
+            title: genreAsync.when(
+              data: (genres) {
+                final genre = genres.firstWhere(
+                  (g) => g.id == widget.genreId,
+                  orElse: () => genres.first,
+                );
+                return Text(
+                  genre.name,
+                  style: const TextStyle(
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                  ),
+                );
+              },
+              loading: () => const Text(''),
+              error: (_, __) => const Text(''),
+            ),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.grey.shade900,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => context.push('/settings'),
+                tooltip: '設定',
+                color: Colors.grey.shade700,
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _handleAddMemo,
+                tooltip: 'メモを追加',
+                color: Colors.grey.shade700,
+              ),
+            ],
+          ),
+          drawer: _GenreDrawer(
+            currentGenreId: widget.genreId,
+            onGenreSelected: (genreId) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              if (genreId != widget.genreId) {
+                context.push('/genre/$genreId');
+              }
             },
-            onTabChanged: _handleTabChanged,
-            onAddMemo: _handleAddMemo,
-            onShowMemoMenu: _showMemoMenu,
-            shouldShowBackButton: _shouldShowBackButton(context),
-            onPop: () => context.pop(),
+          ),
+          onDrawerChanged: (isOpened) {
+            if (isOpened) {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            }
+          },
+          body: DefaultTabController(
+            key: ValueKey(memos.length),
+            length: memos.length,
+            initialIndex: initialIndex,
+            child: _TabControllerWrapper(
+              memos: memos,
+              selectedMemoId: selectedMemoId,
+              genreId: widget.genreId,
+              genreAsync: genreAsync,
+              contentControllers: _contentControllers,
+              onContentControllerCreated: (memoId, controller) {
+                _contentControllers[memoId] = controller;
+              },
+              onTabChanged: _handleTabChanged,
+              onAddMemo: _handleAddMemo,
+              onShowMemoMenu: _showMemoMenu,
+            ),
           ),
         );
       },
@@ -441,19 +504,19 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
     }
   }
 
-  Future<void> _showDeleteMemoDialog(BuildContext context, Memo memo) async {
+  Future<void> _showDeleteMemoDialog(BuildContext dialogContext, Memo memo) async {
     final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: dialogContext,
+      builder: (ctx) => AlertDialog(
         title: const Text('メモを削除'),
         content: const Text('このメモを削除しますか？'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('キャンセル'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('削除'),
           ),
@@ -465,21 +528,18 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
 
     if (result == true) {
       try {
-        // 非同期処理では ref.read を使用
         final repository = ref.read(memoRepositoryProvider);
         final memos = await repository.getByGenreId(widget.genreId);
         final currentIndex = memos.indexWhere((m) => m.id == memo.id);
-        
-        // Undo用にデータを保存
+
         ref.read(undoServiceProvider.notifier).state = UndoData(
           deletedMemo: memo,
           genreId: widget.genreId,
         );
-        
+
         await repository.delete(memo.id);
         ref.invalidate(memosByGenreProvider(widget.genreId));
-        
-        // 削除後の選択メモを決定
+
         if (memos.length > 1) {
           if (currentIndex < memos.length - 1) {
             ref.read(selectedMemoIdProvider.notifier).state = memos[currentIndex + 1].id;
@@ -491,7 +551,9 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
         } else {
           ref.read(selectedMemoIdProvider.notifier).state = null;
         }
-        
+
+        // SnackBar は State の context で表示（invalidate で DefaultTabController が作り直され
+        // 子の Scaffold が dispose されるため、親の ScaffoldMessenger に出す必要がある）
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -516,15 +578,19 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
 
   Future<void> _undoMemoDelete(BuildContext context, Memo memo) async {
     if (!mounted) return;
-    
+
     try {
-      // 非同期処理では ref.read を使用
+      // 削除時に保存した UndoData.deletedMemo / genreId を優先。上書きされていれば閉包の memo / widget.genreId を使う。
+      final data = ref.read(undoServiceProvider);
+      final memoToRestore = data?.deletedMemo ?? memo;
+      final genreId = data?.genreId ?? widget.genreId;
+
       final repository = ref.read(memoRepositoryProvider);
-      await repository.restore(memo);
-      ref.invalidate(memosByGenreProvider(widget.genreId));
-      ref.read(selectedMemoIdProvider.notifier).state = memo.id;
+      await repository.restore(memoToRestore);
+      ref.invalidate(memosByGenreProvider(genreId));
+      ref.read(selectedMemoIdProvider.notifier).state = memoToRestore.id;
       ref.read(undoServiceProvider.notifier).state = null;
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('メモを元に戻しました')),
@@ -569,8 +635,6 @@ class _TabControllerWrapper extends StatefulWidget {
   final void Function(int index, List<Memo> memos) onTabChanged;
   final VoidCallback onAddMemo;
   final void Function(BuildContext context, Memo memo) onShowMemoMenu;
-  final bool shouldShowBackButton;
-  final VoidCallback onPop;
 
   const _TabControllerWrapper({
     required this.memos,
@@ -582,8 +646,6 @@ class _TabControllerWrapper extends StatefulWidget {
     required this.onTabChanged,
     required this.onAddMemo,
     required this.onShowMemoMenu,
-    required this.shouldShowBackButton,
-    required this.onPop,
   });
 
   @override
@@ -711,133 +773,61 @@ class _TabControllerWrapperState extends State<_TabControllerWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // build内ではTabControllerを操作しない
-    // DefaultTabControllerは親のValueKey(memos.length)で管理されるため、
-    // memos.lengthが変わったときのみ再作成される
-    
-    return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () {
-              // ハンバーガーメニューを開く時にSnackBarを消す
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              Scaffold.of(context).openDrawer();
-            },
-            color: Colors.grey.shade700,
-          ),
-        ),
-        title: widget.genreAsync.when(
-          data: (genres) {
-            final genre = genres.firstWhere(
-              (g) => g.id == widget.genreId,
-              orElse: () => genres.first,
-            );
-            return Text(
-              genre.name,
-              style: const TextStyle(
-                fontSize: 20.0,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
-            );
-          },
-          loading: () => const Text(''),
-          error: (_, __) => const Text(''),
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.grey.shade900,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => context.push('/settings'),
-            tooltip: '設定',
-            color: Colors.grey.shade700,
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: widget.onAddMemo,
-            tooltip: 'メモを追加',
-            color: Colors.grey.shade700,
-          ),
-        ],
-      ),
-      drawer: _GenreDrawer(
-        currentGenreId: widget.genreId,
-        onGenreSelected: (genreId) {
-          Navigator.pop(context);
-          // Drawer操作時にSnackBarを消す
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          if (genreId != widget.genreId) {
-            context.push('/genre/$genreId');
-          }
-        },
-      ),
-      onDrawerChanged: (isOpened) {
-        // Drawerが開閉した時にSnackBarを消す
-        if (isOpened) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        }
-      },
-      body: Builder(
-        builder: (context) {
-          final tabController = DefaultTabController.of(context);
-          return AnimatedBuilder(
-            animation: tabController,
-            builder: (context, child) {
-              final selectedIndex = tabController.index;
-              final selectedMemo = selectedIndex >= 0 && selectedIndex < widget.memos.length
-                  ? widget.memos[selectedIndex]
-                  : null;
-              final selectedColor = selectedMemo != null
-                  ? (selectedMemo.colorValue != null
-                      ? Color(selectedMemo.colorValue!)
-                      : getMemoColor(selectedMemo, selected: true))
-                  : Colors.white;
+    // Scaffold は親（GenreDetailScreen）に移した。ここは body の Column のみ。
+    // メモ削除で DefaultTabController が作り直されても親 Scaffold は残り、SnackBar が消えない。
+    return Builder(
+      builder: (context) {
+        final tabController = DefaultTabController.of(context);
+        return AnimatedBuilder(
+          animation: tabController,
+          builder: (context, child) {
+            final selectedIndex = tabController.index;
+            final selectedMemo = selectedIndex >= 0 && selectedIndex < widget.memos.length
+                ? widget.memos[selectedIndex]
+                : null;
+            final selectedColor = selectedMemo != null
+                ? (selectedMemo.colorValue != null
+                    ? Color(selectedMemo.colorValue!)
+                    : getMemoColor(selectedMemo, selected: true))
+                : Colors.white;
 
-              return Column(
-                children: [
-                  _CustomTabBar(
-                    memos: widget.memos,
-                    selectedMemoId: widget.selectedMemoId,
-                    onTabChanged: (index) {
-                      // タブ切り替え時にSnackBarを消す
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                      widget.onTabChanged(index, widget.memos);
-                    },
-                    onLongPress: (memo) {
-                      widget.onShowMemoMenu(context, memo);
-                    },
-                  ),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: selectedColor,
-                        borderRadius: BorderRadius.zero,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.zero,
-                        child: MemoTabBarView(
-                          genreId: widget.genreId,
-                          memos: widget.memos,
-                          selectedMemoId: widget.selectedMemoId,
-                          contentControllers: widget.contentControllers,
-                          onContentControllerCreated: widget.onContentControllerCreated,
-                        ),
+            return Column(
+              children: [
+                _CustomTabBar(
+                  memos: widget.memos,
+                  selectedMemoId: widget.selectedMemoId,
+                  onTabChanged: (index) {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    widget.onTabChanged(index, widget.memos);
+                  },
+                  onLongPress: (memo) {
+                    widget.onShowMemoMenu(context, memo);
+                  },
+                ),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: selectedColor,
+                      borderRadius: BorderRadius.zero,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.zero,
+                      child: MemoTabBarView(
+                        genreId: widget.genreId,
+                        memos: widget.memos,
+                        selectedMemoId: widget.selectedMemoId,
+                        contentControllers: widget.contentControllers,
+                        onContentControllerCreated: widget.onContentControllerCreated,
                       ),
                     ),
                   ),
-                  // 広告バナー（編集画面の外、画面下部）
-                  const AdBannerWidget(),
-                ],
-              );
-            },
-          );
-        },
-      ),
+                ),
+                const AdBannerWidget(),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
