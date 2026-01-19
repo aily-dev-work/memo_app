@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../shared/utils/color_utils.dart';
 import '../domain/memo.dart';
 
 /// メモ本文エディタ
@@ -68,6 +70,9 @@ class _MemoEditorState extends State<MemoEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final bg = getMemoColor(widget.memo, selected: true);
+    final textColor = textColorOnBackground(bg);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: TextField(
@@ -75,11 +80,13 @@ class _MemoEditorState extends State<MemoEditor> {
         focusNode: _focusNode,
         maxLines: null,
         expands: true,
-        decoration: const InputDecoration(
+        cursorColor: textColor,
+        decoration: InputDecoration(
           border: InputBorder.none,
           hintText: 'メモを入力...',
+          hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
         ),
-        style: Theme.of(context).textTheme.bodyLarge,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: textColor),
       ),
     );
   }

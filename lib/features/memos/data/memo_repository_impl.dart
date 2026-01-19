@@ -105,20 +105,6 @@ class MemoRepository {
       });
     }
   }
-
-  /// ジャンル内で検索
-  Future<List<Memo>> search(int genreId, String query) async {
-    if (query.isEmpty) {
-      return getByGenreId(genreId);
-    }
-
-    final lowerQuery = query.toLowerCase();
-    final allMemos = await getByGenreId(genreId);
-    return allMemos.where((memo) {
-      return memo.title.toLowerCase().contains(lowerQuery) ||
-          memo.content.toLowerCase().contains(lowerQuery);
-    }).toList();
-  }
 }
 
 /// MemoRepositoryのProvider

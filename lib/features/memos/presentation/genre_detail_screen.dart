@@ -9,10 +9,10 @@ import '../../genres/domain/genre.dart';
 import '../application/memo_providers.dart';
 import '../data/memo_repository_impl.dart';
 import '../domain/memo.dart';
+import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/undo_service.dart';
 import '../../../shared/ads/ad_banner_widget.dart';
 import 'memo_tab_bar_view.dart';
-import 'memo_search_bar.dart';
 
 /// ジャンル詳細画面（タブ＋本文編集）
 class GenreDetailScreen extends ConsumerStatefulWidget {
@@ -96,7 +96,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
   @override
   Widget build(BuildContext context) {
     // build内でのみ ref.watch を使用
-    final memosAsync = ref.watch(filteredMemosProvider(widget.genreId));
+    final memosAsync = ref.watch(memosByGenreProvider(widget.genreId));
     final selectedMemoId = ref.watch(selectedMemoIdProvider);
     final genreAsync = ref.watch(genresProvider);
 
@@ -136,7 +136,6 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
               backgroundColor: Colors.white,
               foregroundColor: Colors.grey.shade900,
               actions: [
-                const MemoSearchBar(),
                 IconButton(
                   icon: const Icon(Icons.add),
                   onPressed: () => _handleAddMemo(),
@@ -357,7 +356,6 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
       if (!mounted) return;
       
       ref.invalidate(memosByGenreProvider(widget.genreId));
-      ref.invalidate(filteredMemosProvider(widget.genreId));
       ref.read(selectedMemoIdProvider.notifier).state = memoId;
     } catch (e) {
       if (mounted) {
@@ -433,7 +431,6 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
         final repository = ref.read(memoRepositoryProvider);
         await repository.update(memo.copyWith(title: result));
         ref.invalidate(memosByGenreProvider(widget.genreId));
-        ref.invalidate(filteredMemosProvider(widget.genreId));
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -481,7 +478,6 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
         
         await repository.delete(memo.id);
         ref.invalidate(memosByGenreProvider(widget.genreId));
-        ref.invalidate(filteredMemosProvider(widget.genreId));
         
         // 削除後の選択メモを決定
         if (memos.length > 1) {
@@ -526,7 +522,6 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
       final repository = ref.read(memoRepositoryProvider);
       await repository.restore(memo);
       ref.invalidate(memosByGenreProvider(widget.genreId));
-      ref.invalidate(filteredMemosProvider(widget.genreId));
       ref.read(selectedMemoIdProvider.notifier).state = memo.id;
       ref.read(undoServiceProvider.notifier).state = null;
       
@@ -756,7 +751,6 @@ class _TabControllerWrapperState extends State<_TabControllerWrapper> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.grey.shade900,
         actions: [
-          const MemoSearchBar(),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => context.push('/settings'),
@@ -801,7 +795,7 @@ class _TabControllerWrapperState extends State<_TabControllerWrapper> {
               final selectedColor = selectedMemo != null
                   ? (selectedMemo.colorValue != null
                       ? Color(selectedMemo.colorValue!)
-                      : _MemoTab.getMemoColor(selectedMemo, selected: true))
+                      : getMemoColor(selectedMemo, selected: true))
                   : Colors.white;
 
               return Column(
@@ -980,22 +974,6 @@ class _MemoTab extends StatelessWidget {
     required this.onLongPress,
   });
 
-  /// メモのカラー（タブ／本文背景）を取得
-  ///
-  /// - colorValue が設定されていればその色を使う
-  /// - 未設定の場合はメモIDから淡い色を生成
-  static Color getMemoColor(Memo memo, {bool selected = false}) {
-    if (memo.colorValue != null) {
-      // 保存された色をそのまま返す（不透明度は変更しない）
-      return Color(memo.colorValue!);
-    }
-    // 既存メモとの互換性用（IDから色を生成）
-    final hash = memo.id.hashCode;
-    final hue = (hash % 360).abs().toDouble();
-    final base = HSVColor.fromAHSV(1.0, hue, 0.15, 0.98).toColor();
-    return selected ? base.withOpacity(0.6) : base;
-  }
-
   @override
   Widget build(BuildContext context) {
     final title = memo.title.isEmpty
@@ -1005,11 +983,9 @@ class _MemoTab extends StatelessWidget {
         : memo.title;
 
     // 選択時は濃い色、非選択時は淡い色（メモ）
-    final backgroundColor = _MemoTab.getMemoColor(memo, selected: isSelected);
-    
-    final textColor = isSelected
-        ? Colors.grey.shade900 // 選択時は濃いグレー
-        : Colors.grey.shade700; // 非選択時はダークグレー
+    final backgroundColor = getMemoColor(memo, selected: isSelected);
+    // 淡い色なら黒、濃い色なら白
+    final textColor = textColorOnBackground(backgroundColor);
 
     return GestureDetector(
       onTap: onTap,

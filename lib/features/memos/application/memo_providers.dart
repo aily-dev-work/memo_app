@@ -30,17 +30,3 @@ final selectedMemoProvider = Provider<Memo?>((ref) {
   }).value;
 });
 
-/// 検索クエリのProvider
-final searchQueryProvider = StateProvider<String>((ref) => '');
-
-/// フィルタ済みメモのProvider
-final filteredMemosProvider = FutureProvider.family<List<Memo>, int>((ref, genreId) async {
-  final query = ref.watch(searchQueryProvider);
-  final repository = ref.watch(memoRepositoryProvider);
-  
-  if (query.isEmpty) {
-    return repository.getByGenreId(genreId);
-  }
-  
-  return repository.search(genreId, query);
-});

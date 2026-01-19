@@ -277,11 +277,15 @@ class _SidebarGenreList extends ConsumerWidget {
     Genre genre,
   ) async {
     try {
+      // 削除時に保存した UndoData.deletedGenre を優先。上書きされていれば閉包の genre を使う。
+      final data = ref.read(undoServiceProvider);
+      final genreToRestore = data?.deletedGenre ?? genre;
+
       final repository = ref.read(genreRepositoryProvider);
-      await repository.restore(genre);
+      await repository.restore(genreToRestore);
       ref.invalidate(genresProvider);
       ref.read(undoServiceProvider.notifier).state = null;
-      
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ジャンルを元に戻しました')),

@@ -104,7 +104,6 @@ class _MemoTabBarViewState extends ConsumerState<MemoTabBarView> {
 
       // 保存のたびに一覧を無効化し、DB から再取得させる（本文のみの変更でも古いキャッシュで上書きされないように）
       ref.invalidate(memosByGenreProvider(widget.genreId));
-      ref.invalidate(filteredMemosProvider(widget.genreId));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

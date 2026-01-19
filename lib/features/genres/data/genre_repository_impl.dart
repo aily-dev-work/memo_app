@@ -57,8 +57,15 @@ class GenreRepository {
   }
 
   /// ジャンルを復元（Undo用）
+  ///
+  /// sortOrder は既存の最大値+1にし、並び替え後のリストとの衝突を防ぐ。
   Future<void> restore(Genre genre) async {
-    final schema = GenreSchema.fromDomain(genre);
+    final all = await getAll();
+    final maxOrder = all.isEmpty
+        ? 0
+        : all.map((g) => g.sortOrder).reduce((a, b) => a > b ? a : b);
+    final toPut = genre.copyWith(sortOrder: maxOrder + 1);
+    final schema = GenreSchema.fromDomain(toPut);
     await _isar.writeTxn(() async {
       await _isar.genreSchemas.put(schema);
     });
