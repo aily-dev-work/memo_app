@@ -34,6 +34,8 @@ class _MemoTabBarViewState extends ConsumerState<MemoTabBarView> {
 
   @override
   void dispose() {
+    // デバウンス待ちの残りがあれば、dispose 時に controller は子が先に破棄されるため
+    // ここではタイマーをキャンセルするのみ。保存は MemoEditor.onWillDispose で行う。
     for (final timer in _debounceTimers.values) {
       timer.cancel();
     }
@@ -58,6 +60,11 @@ class _MemoTabBarViewState extends ConsumerState<MemoTabBarView> {
           onControllerCreated: (controller) {
             widget.onContentControllerCreated(memo.id, controller);
           },
+          onWillDispose: (m, content) {
+            _debounceTimers[m.id]?.cancel();
+            _debounceTimers.remove(m.id);
+            _saveMemo(m, content);
+          },
         );
       }).toList(),
     );
@@ -68,8 +75,8 @@ class _MemoTabBarViewState extends ConsumerState<MemoTabBarView> {
     final existingTimer = _debounceTimers[memo.id];
     existingTimer?.cancel();
 
-    // 新しいタイマーを設定（500msデバウンス）
-    final timer = Timer(const Duration(milliseconds: 500), () {
+    // 新しいタイマーを設定（300msデバウンス）
+    final timer = Timer(const Duration(milliseconds: 300), () {
       _saveMemo(memo, content);
     });
     _debounceTimers[memo.id] = timer;
@@ -95,11 +102,9 @@ class _MemoTabBarViewState extends ConsumerState<MemoTabBarView> {
         ),
       );
 
-      // タイトルが変更された場合は一覧を更新
-      if (title != memo.title) {
-        ref.invalidate(memosByGenreProvider(widget.genreId));
-        ref.invalidate(filteredMemosProvider(widget.genreId));
-      }
+      // 保存のたびに一覧を無効化し、DB から再取得させる（本文のみの変更でも古いキャッシュで上書きされないように）
+      ref.invalidate(memosByGenreProvider(widget.genreId));
+      ref.invalidate(filteredMemosProvider(widget.genreId));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

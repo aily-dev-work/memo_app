@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'ad_config.dart';
+import '../env/app_env.dart';
 import '../purchase/purchase_providers.dart';
 
 /// バナー広告Widget
@@ -66,14 +67,13 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget> {
   }
 
   String _getAdUnitId() {
-    // テスト用広告ID
-    // 本番では、iOS/Androidそれぞれの実際の広告IDを使用
+    // app_env（--dart-define / flavor）で注入。未指定時は dev のテストID or prod のプレースホルダー
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'ca-app-pub-3940256099942544/6300978111'; // Android テスト用
+      return getAdMobBannerIdAndroid();
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return 'ca-app-pub-3940256099942544/2934735716'; // iOS テスト用
+      return getAdMobBannerIdIos();
     }
-    return 'ca-app-pub-3940256099942544/6300978111'; // デフォルト
+    return getAdMobBannerIdAndroid();
   }
 
   @override

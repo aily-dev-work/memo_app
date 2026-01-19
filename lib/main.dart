@@ -63,6 +63,7 @@ class MemoApp extends ConsumerWidget {
     
     return MaterialApp.router(
       title: 'メモ帳',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,

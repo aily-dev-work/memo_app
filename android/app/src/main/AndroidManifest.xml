@@ -30,10 +30,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- AdMob App ID -->
+        <!-- AdMob App ID（build.gradle.kts の productFlavors で dev/prod を切り替え） -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="${admobAppId}"/>
     </application>
     <!-- INTERNET権限（広告表示に必要） -->
     <uses-permission android:name="android.permission.INTERNET"/>
