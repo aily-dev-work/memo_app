@@ -1,5 +1,5 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+# CocoaPods / Xcode が iOS 13 未満を選ばないようにする
+platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -34,6 +34,8 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  # Flutter 公式テンプレートと同じ（use_frameworks! のみ）。
+  # :linkage => :static は google_mobile_ads の @import 解決に失敗する Xcode 環境がある。
   use_frameworks!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
@@ -42,8 +44,83 @@ target 'Runner' do
   end
 end
 
+def normalize_search_paths(value)
+  return ['$(inherited)'] if value.nil?
+  list = value.is_a?(Array) ? value.flatten : [value]
+  list = list.map(&:to_s).reject(&:empty?)
+  list = ['$(inherited)'] if list.empty?
+  list
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+  end
+
+  # GoogleMobileAds.xcframework のヘッダを #import <GoogleMobileAds/...> で解決できるようにする。
+  # （実機ビルド時にシミュレータ用スライスだけ -F に載ると失敗しやすいため、ヘッダブリッジも併用）
+  xcf_base = File.join(
+    installer.sandbox.root,
+    'Google-Mobile-Ads-SDK',
+    'Frameworks',
+    'GoogleMobileAdsFramework',
+    'GoogleMobileAds.xcframework'
+  )
+  next unless File.directory?(xcf_base)
+
+  device_slice = nil
+  simulator_slice = nil
+  Dir.entries(xcf_base).reject { |d| ['.', '..'].include?(d) }.each do |d|
+    next unless d.start_with?('ios-')
+    slice_dir = File.expand_path(File.join(xcf_base, d))
+    header = File.join(slice_dir, 'GoogleMobileAds.framework', 'Headers', 'GoogleMobileAds.h')
+    next unless File.exist?(header)
+    if d.include?('simulator')
+      simulator_slice = slice_dir
+    else
+      device_slice = slice_dir
+    end
+  end
+
+  # アーキテクチャ非依存の import 用ブリッジ:
+  # HEADER_SEARCH_PATHS に置いた親ディレクトリ配下で
+  # GoogleMobileAds/GoogleMobileAds.h を解決できるようにする。
+  bridge_root = File.join(installer.sandbox.root, 'GoogleMobileAdsImport')
+  bridge_link = File.join(bridge_root, 'GoogleMobileAds')
+  headers_src = nil
+  headers_src = File.join(device_slice, 'GoogleMobileAds.framework', 'Headers') if device_slice
+  headers_src ||= File.join(simulator_slice, 'GoogleMobileAds.framework', 'Headers') if simulator_slice
+  if headers_src && File.directory?(headers_src)
+    require 'fileutils'
+    FileUtils.mkdir_p(bridge_root)
+    FileUtils.rm_f(bridge_link)
+    File.symlink(headers_src, bridge_link)
+  end
+
+  installer.pods_project.targets.each do |target|
+    next unless target.name == 'google_mobile_ads'
+    target.build_configurations.each do |config|
+      fsp = normalize_search_paths(config.build_settings['FRAMEWORK_SEARCH_PATHS'])
+      if device_slice
+        quoted = "\"#{device_slice}\""
+        fsp << quoted unless fsp.any? { |p| p.include?(device_slice) }
+        config.build_settings['FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]'] =
+          (normalize_search_paths(config.build_settings['FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]']) + [quoted]).uniq
+      end
+      if simulator_slice
+        quoted = "\"#{simulator_slice}\""
+        fsp << quoted unless fsp.any? { |p| p.include?(simulator_slice) }
+        config.build_settings['FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]'] =
+          (normalize_search_paths(config.build_settings['FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]']) + [quoted]).uniq
+      end
+      config.build_settings['FRAMEWORK_SEARCH_PATHS'] = fsp.uniq
+
+      if File.directory?(bridge_root)
+        hsp = normalize_search_paths(config.build_settings['HEADER_SEARCH_PATHS'])
+        quoted_bridge = "\"#{bridge_root}\""
+        hsp << quoted_bridge unless hsp.any? { |p| p.include?(bridge_root) }
+        config.build_settings['HEADER_SEARCH_PATHS'] = hsp.uniq
+      end
+    end
   end
 end

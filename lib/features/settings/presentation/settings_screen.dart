@@ -1,7 +1,10 @@
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/purchase/purchase_providers.dart';
 import '../../../shared/purchase/purchase_service.dart';
+import '../../../shared/theme/app_colors.dart';
+import 'help_guide_screen.dart';
 
 /// 設定画面
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -20,6 +23,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final isPremium = ref.watch(isPremiumProvider);
     final productDetails = ref.watch(productDetailsProvider);
     final purchaseService = ref.watch(purchaseServiceProvider);
+    final iapStateAsync = ref.watch(iapInitStateProvider);
+    final currentIapState = ref.watch(currentIapInitStateProvider);
+    final iapState = iapStateAsync.when(
+      data: (s) => s,
+      loading: () => currentIapState,
+      error: (_, __) => currentIapState,
+    );
+    final iapReady = iapState == IapInitState.ready;
+    final canPurchase = !isPremium && iapReady && productDetails != null;
+    final showInitializing = iapState == IapInitState.initializing;
     
     // 購入状態の変化を監視
     if (isPremium && !_previousPremium && _previousPremium != isPremium) {
@@ -38,32 +51,82 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _previousPremium = isPremium;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE8E6E1),
+      backgroundColor: AppColors.canvas,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        backgroundColor: const Color(0xFFE8E6E1),
-        foregroundColor: Colors.grey.shade900,
+        backgroundColor: AppColors.canvas,
+        foregroundColor: AppColors.ink,
         title: const Text(
           '設定',
           style: TextStyle(
             fontSize: 24.0,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
+            color: AppColors.ink,
           ),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20.0),
         children: [
+          // 使い方
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppColors.borderRadius,
+              border: Border.all(
+                color: AppColors.outline,
+                width: 1.0,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 8.0,
+              ),
+              leading: const Icon(
+                Icons.help_outline,
+                color: AppColors.inkSecondary,
+              ),
+              title: const Text(
+                '使い方',
+                style: TextStyle(
+                  fontSize: 18.0,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ink,
+                ),
+              ),
+              subtitle: const Text(
+                '基本操作を確認する',
+                style: TextStyle(
+                  fontSize: 14.0,
+                  color: AppColors.inkSecondary,
+                ),
+              ),
+              trailing: const Icon(
+                Icons.chevron_right,
+                color: AppColors.inkTertiary,
+              ),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const HelpGuideScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
           // 広告削除セクション
           Container(
             padding: const EdgeInsets.all(20.0),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.zero,
+              color: AppColors.surface,
+              borderRadius: AppColors.borderRadius,
               border: Border.all(
-                color: Colors.grey.shade200,
+                color: AppColors.outline,
                 width: 1.0,
               ),
             ),
@@ -74,16 +137,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     Icon(
                       isPremium ? Icons.check_circle : Icons.ads_click,
-                      color: isPremium ? Colors.green : Colors.grey.shade600,
+                      color: isPremium ? Colors.green : AppColors.inkSecondary,
                       size: 24,
                     ),
                     const SizedBox(width: 12),
-                    Text(
+                    const Text(
                       '広告を削除',
                       style: TextStyle(
                         fontSize: 20.0,
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade900,
+                        color: AppColors.ink,
                       ),
                     ),
                   ],
@@ -94,13 +157,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
-                      borderRadius: BorderRadius.zero,
+                      borderRadius: AppColors.borderRadius,
                       border: Border.all(
                         color: Colors.green.shade200,
                         width: 1.0,
                       ),
                     ),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(Icons.check_circle, color: Colors.green, size: 20),
                         const SizedBox(width: 8),
@@ -118,31 +182,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (productDetails != null) ...[
                     Text(
                       '価格: ${productDetails.price}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 16.0,
-                        color: Colors.grey.shade700,
+                        color: AppColors.inkSecondary,
                       ),
                     ),
                     const SizedBox(height: 8),
                   ],
-                  Text(
+                  if (showInitializing) ...[
+                    const Text(
+                      '課金情報を読み込み中です。',
+                      style: TextStyle(
+                        fontSize: 14.0,
+                        color: AppColors.inkSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  const Text(
                     '一度購入すると、広告が表示されなくなります。',
                     style: TextStyle(
                       fontSize: 14.0,
-                      color: Colors.grey.shade600,
+                      color: AppColors.inkSecondary,
                     ),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : () => _handlePurchase(context, purchaseService),
+                      onPressed: (_isLoading || !canPurchase)
+                          ? null
+                          : () => _handlePurchase(context, purchaseService),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade900,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.ink,
+                        foregroundColor: AppColors.surface,
                         padding: const EdgeInsets.symmetric(vertical: 16.0),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
+                          borderRadius: AppColors.borderRadius,
                         ),
                       ),
                       child: _isLoading
@@ -164,27 +240,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: _isLoading ? null : () => _handleRestore(context, purchaseService),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16.0),
-                      side: BorderSide(color: Colors.grey.shade400),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.zero,
+                if (!isPremium) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: (_isLoading || !iapReady)
+                          ? null
+                          : () => _handleRestore(context, purchaseService),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        foregroundColor: AppColors.ink,
+                        side: const BorderSide(color: AppColors.outline),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppColors.borderRadius,
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      '購入を復元',
-                      style: TextStyle(
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.w500,
+                      child: const Text(
+                        '購入を復元',
+                        style: TextStyle(
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -194,6 +275,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _handlePurchase(BuildContext context, PurchaseService service) async {
+    log('[IAP][UI] purchase button tapped');
+    if (service.initState != IapInitState.ready || service.productDetails == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('課金情報を準備中です。しばらくしてからお試しください。'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
 
     try {
@@ -218,6 +310,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _handleRestore(BuildContext context, PurchaseService service) async {
+    log('[IAP][UI] restore button tapped');
     setState(() => _isLoading = true);
 
     try {

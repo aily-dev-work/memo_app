@@ -9,6 +9,8 @@ import '../../genres/domain/genre.dart';
 import '../application/memo_providers.dart';
 import '../data/memo_repository_impl.dart';
 import '../domain/memo.dart';
+import '../domain/memo_format.dart';
+import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/color_utils.dart';
 import '../../../shared/utils/undo_service.dart';
 import '../../../shared/ads/ad_banner_widget.dart';
@@ -100,6 +102,13 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
     final selectedMemoId = ref.watch(selectedMemoIdProvider);
     final genreAsync = ref.watch(genresProvider);
 
+    // 画面幅に応じて 1ペイン / 2ペイン を判定
+    final media = MediaQuery.of(context);
+    final isTwoPane = Breakpoints.shouldShowTwoPane(
+      width: media.size.width,
+      isLandscape: media.orientation == Orientation.landscape,
+    );
+
     return memosAsync.when(
       data: (memos) {
         if (memos.isEmpty) {
@@ -112,7 +121,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => context.pop(),
-                      color: Colors.grey.shade700,
+                      color: AppColors.inkSecondary,
                     )
                   : null,
               title: genreAsync.when(
@@ -121,31 +130,44 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
                     (g) => g.id == widget.genreId,
                     orElse: () => genres.first,
                   );
-                  return Text(
-                    genre.name,
-                    style: const TextStyle(
-                      fontSize: 20.0,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
-                    ),
-                  );
+                  return _MemoScreenTitle(genreName: genre.name);
                 },
                 loading: () => const Text(''),
                 error: (_, __) => const Text(''),
               ),
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.grey.shade900,
+              backgroundColor: AppColors.surface,
+              foregroundColor: AppColors.ink,
               actions: [
                 IconButton(
                   icon: const Icon(Icons.add),
                   onPressed: () => _handleAddMemo(),
                   tooltip: 'メモを追加',
-                  color: Colors.grey.shade700,
+                  color: AppColors.inkSecondary,
                 ),
               ],
             ),
+            backgroundColor: AppColors.canvas,
             body: const Center(
-              child: Text('＋でメモを追加'),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'メモ（タブ）がありません',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.inkSecondary,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '右上の「＋」でメモを追加できます',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.inkTertiary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -158,61 +180,63 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
           appBar: AppBar(
             elevation: 0,
             scrolledUnderElevation: 0,
-            leading: Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () {
-                  ScaffoldMessenger.of(ctx).hideCurrentSnackBar();
-                  Scaffold.of(ctx).openDrawer();
-                },
-                color: Colors.grey.shade700,
-              ),
-            ),
+            // iPad など 2ペイン表示時は、左の固定サイドバーがあるので
+            // ここではハンバーガーメニューを出さない。
+            leading: isTwoPane
+                ? null
+                : Builder(
+                    builder: (ctx) => IconButton(
+                      icon: const Icon(Icons.menu),
+                      onPressed: () {
+                        ScaffoldMessenger.of(ctx).hideCurrentSnackBar();
+                        Scaffold.of(ctx).openDrawer();
+                      },
+                      color: AppColors.inkSecondary,
+                    ),
+                  ),
             title: genreAsync.when(
               data: (genres) {
                 final genre = genres.firstWhere(
                   (g) => g.id == widget.genreId,
                   orElse: () => genres.first,
                 );
-                return Text(
-                  genre.name,
-                  style: const TextStyle(
-                    fontSize: 20.0,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.2,
-                  ),
-                );
+                return _MemoScreenTitle(genreName: genre.name);
               },
               loading: () => const Text(''),
               error: (_, __) => const Text(''),
             ),
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.grey.shade900,
+            backgroundColor: AppColors.surface,
+            foregroundColor: AppColors.ink,
             actions: [
               IconButton(
                 icon: const Icon(Icons.settings_outlined),
                 onPressed: () => context.push('/settings'),
                 tooltip: '設定',
-                color: Colors.grey.shade700,
+                color: AppColors.inkSecondary,
               ),
               IconButton(
                 icon: const Icon(Icons.add),
                 onPressed: _handleAddMemo,
                 tooltip: 'メモを追加',
-                color: Colors.grey.shade700,
+                color: AppColors.inkSecondary,
               ),
             ],
           ),
-          drawer: _GenreDrawer(
-            currentGenreId: widget.genreId,
-            onGenreSelected: (genreId) {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              if (genreId != widget.genreId) {
-                context.push('/genre/$genreId');
-              }
-            },
-          ),
+          backgroundColor: AppColors.canvas,
+          // 2ペイン表示時は左側にサイドバーが常時表示されているため、
+          // Drawer はスマホなど 1ペイン表示時のみ有効にする。
+          drawer: isTwoPane
+              ? null
+              : _GenreDrawer(
+                  currentGenreId: widget.genreId,
+                  onGenreSelected: (genreId) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    if (genreId != widget.genreId) {
+                      context.push('/genre/$genreId');
+                    }
+                  },
+                ),
           onDrawerChanged: (isOpened) {
             if (isOpened) {
               ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -246,7 +270,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
                 (g) => g.id == widget.genreId,
                 orElse: () => genres.first,
               );
-              return Text(genre.name);
+              return _MemoScreenTitle(genreName: genre.name);
             },
             loading: () => const Text(''),
             error: (_, __) => const Text(''),
@@ -262,7 +286,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
                 (g) => g.id == widget.genreId,
                 orElse: () => genres.first,
               );
-              return Text(genre.name);
+              return _MemoScreenTitle(genreName: genre.name);
             },
             loading: () => const Text(''),
             error: (_, __) => const Text(''),
@@ -288,17 +312,41 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
     if (!mounted) return;
     
     try {
-      // まずタブ名称入力ダイアログを表示
+      // 形式選択
+      final format = await showDialog<MemoFormat>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('メモの形式を選択'),
+          children: MemoFormat.values.map((f) {
+            return SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, f),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(f.icon),
+                title: Text(f.displayName),
+                subtitle: Text(f.description),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+
+      if (!mounted || format == null) {
+        return;
+      }
+
+      // メモ名入力ダイアログを表示
       final controller = TextEditingController();
       final title = await showDialog<String>(
         context: context,
+        barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: const Text('タブの名称を入力'),
+          title: const Text('メモの名前を入力'),
           content: TextField(
             controller: controller,
             autofocus: true,
             decoration: const InputDecoration(
-              hintText: 'タブ名',
+              hintText: 'メモ名',
             ),
           ),
           actions: [
@@ -320,92 +368,11 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
       }
       
       // 続いてカラー選択ダイアログを表示
-      final selectedColor = await showDialog<Color>(
-        context: context,
-        builder: (context) {
-          final colors = <Color>[
-            // イエロー系
-            const Color(0xFFFFF9C4), // 明るいイエロー
-            const Color(0xFFFFF59D), // レモンイエロー
-            const Color(0xFFFFF176), // サンイエロー
-            const Color(0xFFFFFDE7), // クリーム
-            // オレンジ系
-            const Color(0xFFFFE0B2), // オレンジ
-            const Color(0xFFFFCCBC), // ピーチ
-            const Color(0xFFFFE5B4), // アプリコット
-            // ピンク系
-            const Color(0xFFFFCDD2), // ピンク
-            const Color(0xFFF8BBD0), // ローズピンク
-            const Color(0xFFFFE1F5), // ライトピンク
-            // パープル系
-            const Color(0xFFD1C4E9), // パープル
-            const Color(0xFFE1BEE7), // ラベンダー
-            const Color(0xFFF3E5F5), // ライトパープル
-            // ブルー系
-            const Color(0xFFB3E5FC), // 水色
-            const Color(0xFFBBDEFB), // スカイブルー
-            const Color(0xFFC5CAE9), // ペールブルー
-            const Color(0xFFE3F2FD), // ライトブルー
-            // グリーン系
-            const Color(0xFFC8E6C9), // グリーン
-            const Color(0xFFDCEDC8), // ライムグリーン
-            const Color(0xFFE8F5E9), // ミントグリーン
-            // クールな色（男性向け）
-            const Color(0xFF90CAF9), // コバルトブルー
-            const Color(0xFF64B5F6), // ブライトブルー
-            const Color(0xFF81C784), // エメラルドグリーン
-            const Color(0xFFA5D6A7), // セージグリーン
-            const Color(0xFFB0BEC5), // スレートグレー
-            const Color(0xFF90A4AE), // ブルーグレー
-            const Color(0xFF78909C), // チャコールグレー
-            const Color(0xFF9E9E9E), // ミディアムグレー
-            const Color(0xFF607D8B), // ブルーグレー（ダーク）
-            const Color(0xFF546E7A), // スチールブルー
-            const Color(0xFF455A64), // ダークスレート
-            const Color(0xFF37474F), // ダークブルーグレー
-            // その他
-            const Color(0xFFCFD8DC), // ブルーグレー
-            const Color(0xFFE0E0E0), // ライトグレー
-            const Color(0xFFFFF3E0), // ベージュ
-          ];
-          return AlertDialog(
-            title: const Text('カラーを選択'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  alignment: WrapAlignment.center,
-                  children: colors.map((color) {
-                    return GestureDetector(
-                      onTap: () => Navigator.pop(context, color),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.grey.shade300,
-                            width: 1,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          );
-        },
-      );
-      
+      final selectedColor = await showMemoColorPicker(context);
+
       // カラー未選択の場合はデフォルトカラーを使用
-      final colorToSave = selectedColor ?? const Color(0xFFFFF9C4);
-      
-      // 色の値をそのまま保存（Color.valueは既に0xAARRGGBB形式）
-      final colorValue = colorToSave.value;
+      final colorToSave = selectedColor ?? AppColors.defaultMemo;
+      final colorValue = colorToSave.toARGB32();
       
       // 非同期処理では ref.read を使用
       final repository = ref.read(memoRepositoryProvider);
@@ -413,6 +380,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
         genreId: widget.genreId,
         title: title,
         content: '',
+        format: format,
         colorValue: colorValue,
       );
       
@@ -438,7 +406,7 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit),
-              title: const Text('タイトルを変更'),
+              title: const Text('メモの名前を変更'),
               onTap: () => Navigator.pop(context, 'edit'),
             ),
             ListTile(
@@ -465,12 +433,12 @@ class _GenreDetailScreenState extends ConsumerState<GenreDetailScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('タイトルを変更'),
+        title: const Text('メモの名前を変更'),
         content: TextField(
           controller: controller,
           autofocus: true,
           decoration: const InputDecoration(
-            hintText: 'タイトル',
+            hintText: 'メモ名',
           ),
         ),
         actions: [
@@ -789,7 +757,7 @@ class _TabControllerWrapperState extends State<_TabControllerWrapper> {
                 ? (selectedMemo.colorValue != null
                     ? Color(selectedMemo.colorValue!)
                     : getMemoColor(selectedMemo, selected: true))
-                : Colors.white;
+                : AppColors.surface;
 
             return Column(
               children: [
@@ -918,11 +886,11 @@ class _ScrollableTabBarState extends State<_ScrollableTabBar> {
 
         return Container(
           height: 60.0, // タブバーの高さを少し高めにしてテキストの余白を確保
-          decoration: BoxDecoration(
-            color: Colors.white,
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
             border: Border(
               bottom: BorderSide(
-                color: Colors.grey.shade100,
+                color: AppColors.outline,
                 width: 1.0,
               ),
             ),
@@ -1024,10 +992,9 @@ class _GenreDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final genresAsync = ref.watch(genresProvider);
-    final theme = Theme.of(context);
 
     return Drawer(
-      backgroundColor: Colors.grey.shade800, // 落ち着いたグレー色
+      backgroundColor: AppColors.drawer,
       child: SafeArea(
         child: Column(
           children: [
@@ -1036,27 +1003,41 @@ class _GenreDrawer extends ConsumerWidget {
               padding: const EdgeInsets.all(20.0),
               child: Row(
                 children: [
-                  const Text(
-                    'LayerMemo',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20.0,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.2,
-                    ),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'LayerMemo',
+                        style: TextStyle(
+                          color: AppColors.inkTertiary,
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      Text(
+                        'ジャンル一覧',
+                        style: TextStyle(
+                          color: AppColors.surface,
+                          fontSize: 20.0,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ],
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    icon: const Icon(Icons.close, color: AppColors.surface),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
             ),
-            const Divider(color: Colors.white54, height: 1),
+            Divider(color: AppColors.surface.withValues(alpha: 0.3), height: 1),
             // ホームボタン
             _HomeButtonInDrawer(),
-            const Divider(color: Colors.white54, height: 1),
+            Divider(color: AppColors.surface.withValues(alpha: 0.3), height: 1),
             // ジャンル一覧
             Expanded(
               child: genresAsync.when(
@@ -1065,7 +1046,7 @@ class _GenreDrawer extends ConsumerWidget {
                     return const Center(
                       child: Text(
                         'ジャンルがありません',
-                        style: TextStyle(color: Colors.white70),
+                        style: TextStyle(color: AppColors.inkTertiary),
                       ),
                     );
                   }
@@ -1084,12 +1065,12 @@ class _GenreDrawer extends ConsumerWidget {
                   );
                 },
                 loading: () => const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
+                  child: CircularProgressIndicator(color: AppColors.surface),
                 ),
                 error: (error, stack) => Center(
                   child: Text(
                     'エラー: $error',
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(color: AppColors.surface),
                   ),
                 ),
               ),
@@ -1163,14 +1144,14 @@ class _GenreDrawerItem extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
       decoration: BoxDecoration(
-        color: isSelected ? Colors.white : Colors.transparent,
+        color: isSelected ? AppColors.surface : Colors.transparent,
         borderRadius: BorderRadius.zero,
       ),
       child: ListTile(
         title: Text(
           genre.name,
           style: TextStyle(
-            color: isSelected ? Colors.grey.shade900 : Colors.white,
+            color: isSelected ? AppColors.ink : AppColors.surface,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 16.0,
           ),
@@ -1190,15 +1171,15 @@ class _HomeButtonInDrawer extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: AppColors.surface.withValues(alpha: 0.1),
         borderRadius: BorderRadius.zero,
       ),
       child: ListTile(
-        leading: const Icon(Icons.home_outlined, color: Colors.white, size: 24),
+        leading: const Icon(Icons.home_outlined, color: AppColors.surface, size: 24),
         title: const Text(
-          'ホーム',
+          'ジャンル一覧',
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.surface,
             fontSize: 16.0,
             fontWeight: FontWeight.w500,
           ),
@@ -1208,6 +1189,43 @@ class _HomeButtonInDrawer extends StatelessWidget {
           context.go('/'); // ジャンル一覧画面に遷移
         },
       ),
+    );
+  }
+}
+
+/// メモ画面のAppBarタイトル（使い方の「メモ一覧」階層に合わせる）
+class _MemoScreenTitle extends StatelessWidget {
+  final String genreName;
+
+  const _MemoScreenTitle({required this.genreName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'メモ',
+          style: TextStyle(
+            fontSize: 12.0,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 1.0,
+            color: AppColors.inkSecondary,
+            height: 1.1,
+          ),
+        ),
+        Text(
+          genreName,
+          style: const TextStyle(
+            fontSize: 20.0,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
+            height: 1.2,
+            color: AppColors.ink,
+          ),
+        ),
+      ],
     );
   }
 }

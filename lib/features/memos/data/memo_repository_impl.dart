@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import '../../../shared/data/isar_service.dart';
+import '../domain/checklist_content.dart';
 import '../domain/memo.dart';
+import '../domain/memo_format.dart';
+import '../domain/table_content.dart';
 import 'memo_repository.dart';
 
 /// Memoリポジトリの実装
@@ -32,6 +35,7 @@ class MemoRepository {
     required int genreId,
     required String title,
     required String content,
+    MemoFormat format = MemoFormat.normal,
     int? colorValue,
   }) async {
     final now = DateTime.now();
@@ -40,10 +44,25 @@ class MemoRepository {
         ? 0
         : memos.map((m) => m.sortOrder).reduce((a, b) => a > b ? a : b);
 
+    final String initialContent;
+    if (content.isEmpty) {
+      switch (format) {
+        case MemoFormat.checklist:
+          initialContent = ChecklistContentCodec.emptyContent();
+        case MemoFormat.table:
+          initialContent = TableContentCodec.emptyContent();
+        case MemoFormat.normal:
+          initialContent = content;
+      }
+    } else {
+      initialContent = content;
+    }
+
     final schema = MemoSchema()
       ..genreId = genreId
       ..title = title
-      ..content = content
+      ..content = initialContent
+      ..format = format.storageValue
       ..sortOrder = maxSortOrder + 1
       ..createdAt = now
       ..updatedAt = now

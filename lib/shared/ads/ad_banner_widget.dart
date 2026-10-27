@@ -1,10 +1,12 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'ad_config.dart';
-import '../env/app_env.dart';
+import 'ad_ids.dart';
 import '../purchase/purchase_providers.dart';
 
 /// バナー広告Widget
@@ -17,33 +19,62 @@ class AdBannerWidget extends ConsumerStatefulWidget {
 }
 
 class _AdBannerWidgetState extends ConsumerState<AdBannerWidget> {
+  static const int _maxLoadRetries = 3;
+  static const Duration _retryDelay = Duration(seconds: 3);
+
   BannerAd? _bannerAd;
   bool _isAdLoaded = false;
+  int _failedLoadRetries = 0;
+  Timer? _retryTimer;
 
   @override
   void initState() {
     super.initState();
-    _loadAd();
+    // IAP の SharedPreferences 反映後に読み込む（initState 直後だと未課金判定がずれる可能性）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!ref.read(isPremiumProvider)) _loadAd(resetRetries: true);
+    });
   }
 
-  void _loadAd() {
+  void _disposeBannerOnly() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _bannerAd?.dispose();
+    _bannerAd = null;
+    _isAdLoaded = false;
+  }
+
+  void _loadAd({bool resetRetries = false}) {
     if (!kShowAds) return;
 
-    // Premium状態を確認
     final isPremium = ref.read(isPremiumProvider);
     if (isPremium) {
-      return; // Premiumユーザーには広告を表示しない
+      return;
     }
 
-    // テスト用広告ID（本番では実際の広告IDに置き換える）
-    final adUnitId = _getAdUnitId();
-    
+    if (resetRetries) {
+      _failedLoadRetries = 0;
+    }
+
+    _bannerAd?.dispose();
+    _bannerAd = null;
+    if (mounted) {
+      setState(() {
+        _isAdLoaded = false;
+      });
+    }
+
+    final adUnitId = AdIds.bannerId;
+    developer.log('バナー読み込み開始 unit=$adUnitId', name: 'Ads');
+
     _bannerAd = BannerAd(
       adUnitId: adUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (_) {
+          _failedLoadRetries = 0;
           if (mounted) {
             setState(() {
               _isAdLoaded = true;
@@ -51,12 +82,18 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget> {
           }
         },
         onAdFailedToLoad: (ad, error) {
+          developer.log(
+            'バナー読み込み失敗 code=${error.code} domain=${error.domain} message=${error.message}',
+            name: 'Ads',
+            level: 1000,
+          );
           ad.dispose();
           if (mounted) {
             setState(() {
               _isAdLoaded = false;
             });
           }
+          _scheduleRetryIfNeeded();
         },
         onAdOpened: (_) {},
         onAdClosed: (_) {},
@@ -66,18 +103,25 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget> {
     _bannerAd?.load();
   }
 
-  String _getAdUnitId() {
-    // app_env（--dart-define / flavor）で注入。未指定時は dev のテストID or prod のプレースホルダー
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return getAdMobBannerIdAndroid();
-    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return getAdMobBannerIdIos();
+  void _scheduleRetryIfNeeded() {
+    if (!mounted) return;
+    if (ref.read(isPremiumProvider)) return;
+    if (_failedLoadRetries >= _maxLoadRetries) {
+      developer.log('バナー再試行上限（$_maxLoadRetries回）に達しました', name: 'Ads');
+      return;
     }
-    return getAdMobBannerIdAndroid();
+    _failedLoadRetries++;
+    _retryTimer?.cancel();
+    _retryTimer = Timer(_retryDelay, () {
+      if (!mounted) return;
+      if (ref.read(isPremiumProvider)) return;
+      _loadAd();
+    });
   }
 
   @override
   void dispose() {
+    _retryTimer?.cancel();
     _bannerAd?.dispose();
     super.dispose();
   }
@@ -85,6 +129,16 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget> {
   @override
   Widget build(BuildContext context) {
     if (!kShowAds) return const SizedBox.shrink();
+
+    ref.listen<bool>(isPremiumProvider, (previous, next) {
+      if (next) {
+        _retryTimer?.cancel();
+        _disposeBannerOnly();
+      } else if (previous == true) {
+        // 課金状態が Premium → 非Premium に変わったときのみ再読み込み（初回の postFrame と二重にならない）
+        _loadAd(resetRetries: true);
+      }
+    });
 
     final isPremium = ref.watch(isPremiumProvider);
 

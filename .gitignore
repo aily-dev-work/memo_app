@@ -52,3 +52,17 @@ app.*.map.json
 # Android build artifacts
 /android/.gradle/
 /android/app/build/
+
+# Additional security exclusions
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.p8
+*.keystore
+
+# Firebase local configuration
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist

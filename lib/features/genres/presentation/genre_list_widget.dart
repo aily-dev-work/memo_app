@@ -5,6 +5,7 @@ import 'package:isar/isar.dart';
 import '../application/genre_providers.dart';
 import '../data/genre_repository_impl.dart';
 import '../domain/genre.dart';
+import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/undo_service.dart';
 import '../../../shared/ads/ad_banner_widget.dart';
 
@@ -29,33 +30,51 @@ class _GenreListWidgetState extends ConsumerState<GenreListWidget> {
     final genresAsync = ref.watch(genresProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE8E6E1), // グレージュっぽい色
+      backgroundColor: AppColors.canvas,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
-        backgroundColor: const Color(0xFFE8E6E1), // グレージュっぽい色
-        foregroundColor: Colors.grey.shade900,
-        title: const Text(
-          'LayerMemo',
-          style: TextStyle(
-            fontSize: 24.0,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1.2,
-            fontFamily: 'SF Pro Display',
-          ),
+        backgroundColor: AppColors.canvas,
+        foregroundColor: AppColors.ink,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'LayerMemo',
+              style: TextStyle(
+                fontSize: 12.0,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 1.0,
+                color: AppColors.inkSecondary,
+                fontFamily: 'SF Pro Display',
+                height: 1.1,
+              ),
+            ),
+            Text(
+              'ジャンル一覧',
+              style: TextStyle(
+                fontSize: 22.0,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
+                height: 1.2,
+                color: AppColors.ink,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => context.push('/settings'),
             tooltip: '設定',
-            color: Colors.grey.shade700,
+            color: AppColors.inkSecondary,
           ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () => _showAddGenreDialog(context),
             tooltip: 'ジャンルを追加',
-            color: Colors.grey.shade700,
+            color: AppColors.inkSecondary,
           ),
         ],
       ),
@@ -66,18 +85,26 @@ class _GenreListWidgetState extends ConsumerState<GenreListWidget> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.folder_outlined,
                     size: 64,
-                    color: Colors.grey.shade300,
+                    color: AppColors.outline,
                   ),
                   const SizedBox(height: 24),
-                  Text(
+                  const Text(
                     'ジャンルがありません',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey.shade500,
+                      color: AppColors.inkTertiary,
                       fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '右上の「＋」でジャンルを作成できます',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.inkTertiary,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -86,9 +113,11 @@ class _GenreListWidgetState extends ConsumerState<GenreListWidget> {
                     label: const Text('ジャンルを追加'),
                     onPressed: () => _showAddGenreDialog(context),
                     style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.ink,
+                      side: const BorderSide(color: AppColors.outline),
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppColors.borderRadius,
                       ),
                     ),
                   ),
@@ -350,17 +379,15 @@ class _GenreListItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.zero,
+        borderRadius: AppColors.borderRadius,
         child: Container(
           margin: const EdgeInsets.only(bottom: 8.0),
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.grey.shade50 : Colors.white,
-            borderRadius: BorderRadius.zero,
+            color: isSelected ? AppColors.surfaceMuted : AppColors.surface,
+            borderRadius: AppColors.borderRadius,
             border: Border.all(
-              color: isSelected 
-                  ? Colors.grey.shade300 
-                  : Colors.grey.shade200,
+              color: AppColors.outline,
               width: 1.0,
             ),
           ),
@@ -372,19 +399,19 @@ class _GenreListItem extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 17.0,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: Colors.grey.shade900,
+                    color: AppColors.ink,
                     letterSpacing: 0.1,
                   ),
                 ),
               ),
               PopupMenuButton<String>(
-                icon: Icon(
+                icon: const Icon(
                   Icons.more_vert,
                   size: 20,
-                  color: Colors.grey.shade400,
+                  color: AppColors.inkTertiary,
                 ),
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppColors.borderRadius,
                 ),
                 itemBuilder: (context) => [
                   const PopupMenuItem(
@@ -401,9 +428,9 @@ class _GenreListItem extends StatelessWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                        Icon(Icons.delete_outline, size: 20, color: AppColors.danger),
                         SizedBox(width: 12),
-                        Text('削除', style: TextStyle(color: Colors.red)),
+                        Text('削除', style: TextStyle(color: AppColors.danger)),
                       ],
                     ),
                   ),

@@ -5,7 +5,11 @@ import 'package:isar/isar.dart';
 import '../application/memo_providers.dart';
 import '../data/memo_repository_impl.dart';
 import '../domain/memo.dart';
+import '../domain/memo_format.dart';
+import '../../../shared/theme/app_colors.dart';
+import 'checklist_memo_editor.dart';
 import 'memo_editor.dart';
+import 'table_memo_editor.dart';
 
 /// メモのTabBarView
 class MemoTabBarView extends ConsumerStatefulWidget {
@@ -47,25 +51,72 @@ class _MemoTabBarViewState extends ConsumerState<MemoTabBarView> {
   Widget build(BuildContext context) {
     if (widget.memos.isEmpty) {
       return const Center(
-        child: Text('＋でメモを追加'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'メモ（タブ）がありません',
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.inkSecondary,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '右上の「＋」でメモを追加できます',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.inkTertiary,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
     return TabBarView(
       children: widget.memos.map((memo) {
-        return MemoEditor(
-          key: ValueKey(memo.id),
-          memo: memo,
-          onContentChanged: (content) => _handleContentChanged(memo, content),
-          onControllerCreated: (controller) {
-            widget.onContentControllerCreated(memo.id, controller);
-          },
-          onWillDispose: (m, content) {
-            _debounceTimers[m.id]?.cancel();
-            _debounceTimers.remove(m.id);
-            _saveMemo(m, content);
-          },
-        );
+        switch (memo.format) {
+          case MemoFormat.checklist:
+            return ChecklistMemoEditor(
+              key: ValueKey('checklist-${memo.id}'),
+              memo: memo,
+              onContentChanged: (content) =>
+                  _handleContentChanged(memo, content),
+              onWillDispose: (m, content) {
+                _debounceTimers[m.id]?.cancel();
+                _debounceTimers.remove(m.id);
+                _saveMemo(m, content);
+              },
+            );
+          case MemoFormat.table:
+            return TableMemoEditor(
+              key: ValueKey('table-${memo.id}'),
+              memo: memo,
+              onContentChanged: (content) =>
+                  _handleContentChanged(memo, content),
+              onWillDispose: (m, content) {
+                _debounceTimers[m.id]?.cancel();
+                _debounceTimers.remove(m.id);
+                _saveMemo(m, content);
+              },
+            );
+          case MemoFormat.normal:
+            return MemoEditor(
+              key: ValueKey('normal-${memo.id}'),
+              memo: memo,
+              onContentChanged: (content) =>
+                  _handleContentChanged(memo, content),
+              onControllerCreated: (controller) {
+                widget.onContentControllerCreated(memo.id, controller);
+              },
+              onWillDispose: (m, content) {
+                _debounceTimers[m.id]?.cancel();
+                _debounceTimers.remove(m.id);
+                _saveMemo(m, content);
+              },
+            );
+        }
       }).toList(),
     );
   }
@@ -86,9 +137,11 @@ class _MemoTabBarViewState extends ConsumerState<MemoTabBarView> {
     try {
       final repository = ref.read(memoRepositoryProvider);
       
-      // タイトルが空なら本文の先頭1行をタイトルに
+      // タイトルが空なら本文の先頭1行をタイトルに（通常メモのみ）
       String title = memo.title;
-      if (title.isEmpty && content.isNotEmpty) {
+      if (memo.format == MemoFormat.normal &&
+          title.isEmpty &&
+          content.isNotEmpty) {
         title = content.split('\n').first.trim();
         if (title.isEmpty) {
           title = '無題';

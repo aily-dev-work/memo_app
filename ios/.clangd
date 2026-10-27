@@ -1,0 +1,12 @@
+# Cursor / clangd が Runner の .m を解析するとき、CocoaPods のモジュールマップを渡す。
+# （Xcode 本体のビルドは xcconfig 経由で解決される）
+If:
+  PathMatch: .*Runner/.*\.m$
+CompileFlags:
+  Add:
+    - "-fmodule-map-file=Pods/Target Support Files/google_mobile_ads/google_mobile_ads.modulemap"
+    - "-fmodule-map-file=Pods/Target Support Files/in_app_purchase_storekit/in_app_purchase_storekit.modulemap"
+    - "-fmodule-map-file=Pods/Target Support Files/isar_flutter_libs/isar_flutter_libs.modulemap"
+    - "-fmodule-map-file=Pods/Target Support Files/path_provider_foundation/path_provider_foundation.modulemap"
+    - "-fmodule-map-file=Pods/Target Support Files/shared_preferences_foundation/shared_preferences_foundation.modulemap"
+    - "-fmodule-map-file=Pods/Target Support Files/webview_flutter_wkwebview/webview_flutter_wkwebview.modulemap"

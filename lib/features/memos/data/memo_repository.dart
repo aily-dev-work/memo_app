@@ -1,5 +1,6 @@
 import 'package:isar/isar.dart';
 import '../domain/memo.dart';
+import '../domain/memo_format.dart';
 
 part 'memo_repository.g.dart';
 
@@ -14,6 +15,9 @@ class MemoSchema {
   late String title;
   
   late String content;
+
+  /// メモ形式（normal / checklist）。既存データは空文字 → Domain 側で normal 扱い
+  String format = MemoFormat.normal.storageValue;
   
   late int sortOrder;
   
@@ -36,6 +40,7 @@ class MemoSchema {
       genreId: genreId,
       title: title,
       content: content,
+      format: MemoFormatX.fromStorage(format),
       sortOrder: sortOrder,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -51,6 +56,7 @@ class MemoSchema {
       ..genreId = memo.genreId
       ..title = memo.title
       ..content = memo.content
+      ..format = memo.format.storageValue
       ..sortOrder = memo.sortOrder
       ..createdAt = memo.createdAt
       ..updatedAt = memo.updatedAt

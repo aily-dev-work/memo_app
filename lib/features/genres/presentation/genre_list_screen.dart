@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:isar/isar.dart';
 import '../../../shared/breakpoints.dart';
+import '../../../shared/theme/app_colors.dart';
 import '../../../shared/utils/undo_service.dart';
 import '../../../shared/ads/ad_banner_widget.dart';
 import '../application/genre_providers.dart';
@@ -48,7 +49,11 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
               child: selectedGenreId != null
                   ? GenreDetailScreen(genreId: selectedGenreId)
                   : const Center(
-                      child: Text('ジャンルを選択してください'),
+                      child: Text(
+                        'ジャンルを選ぶと、メモ（タブ）が表示されます',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.inkSecondary),
+                      ),
                     ),
             ),
           ],
@@ -85,52 +90,66 @@ class _CollapsibleSidebarState extends ConsumerState<_CollapsibleSidebar> {
   Widget build(BuildContext context) {
     final isOpen = ref.watch(sidebarOpenProvider);
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
       width: isOpen ? 280.0 : 72.0,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
+      decoration: const BoxDecoration(
+        color: AppColors.canvas,
         border: Border(
           right: BorderSide(
-            color: colorScheme.outlineVariant.withOpacity(0.5),
+            color: AppColors.outline,
             width: 1,
           ),
         ),
       ),
       child: Column(
         children: [
-          // ヘッダー（開閉ボタン）
+          // ヘッダー（開閉ボタン）- 上余白で時計表示との距離をしっかり確保
           Container(
-            height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 88,
+            padding: const EdgeInsets.fromLTRB(16, 40, 16, 12),
             child: Row(
               children: [
                 if (isOpen) ...[
                   Expanded(
-                    child: Text(
-                      'LayerMemo',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
-                        letterSpacing: 1.2,
-                        fontSize: 18,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'LayerMemo',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.inkSecondary,
+                            letterSpacing: 1.0,
+                            fontFamily: 'SF Pro Display',
+                          ),
+                        ),
+                        Text(
+                          'ジャンル一覧',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ink,
+                            letterSpacing: 0.6,
+                            fontSize: 20,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
                 IconButton(
                   icon: Icon(
-                    isOpen ? Icons.chevron_left : Icons.menu,
+                    isOpen ? Icons.chevron_left : Icons.chevron_right,
                     size: 24,
                   ),
                   onPressed: () {
                     ref.read(sidebarOpenProvider.notifier).state = !isOpen;
                   },
                   tooltip: isOpen ? 'サイドバーを閉じる' : 'サイドバーを開く',
-                  color: Colors.grey.shade700,
+                  color: AppColors.inkSecondary,
                 ),
               ],
             ),
@@ -313,9 +332,10 @@ class _SidebarGenreList extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                isOpen ? '＋でジャンルを追加' : '+',
+                isOpen ? '右上の「＋」でジャンルを作成' : '+',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
+                  fontSize: 17,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -383,7 +403,6 @@ class _SidebarGenreItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -391,7 +410,7 @@ class _SidebarGenreItem extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.zero,
+          borderRadius: AppColors.borderRadius,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: EdgeInsets.symmetric(
@@ -400,9 +419,9 @@ class _SidebarGenreItem extends ConsumerWidget {
             ),
             decoration: BoxDecoration(
               color: isSelected
-                  ? Colors.grey.shade100
+                  ? AppColors.surfaceMuted
                   : Colors.transparent,
-              borderRadius: BorderRadius.zero,
+              borderRadius: AppColors.borderRadius,
             ),
             child: isOpen
                 ? Row(
@@ -411,11 +430,12 @@ class _SidebarGenreItem extends ConsumerWidget {
                         child: Text(
                           genre.name,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurface,
+                            color: AppColors.ink,
                             fontWeight: isSelected
                                 ? FontWeight.w600
                                 : FontWeight.normal,
                             letterSpacing: 0.1,
+                            fontSize: 17,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -423,13 +443,13 @@ class _SidebarGenreItem extends ConsumerWidget {
                       ),
                       // メニューボタン
                       PopupMenuButton<String>(
-                        icon: Icon(
+                        icon: const Icon(
                           Icons.more_vert,
                           size: 18,
-                          color: Colors.grey.shade400,
+                          color: AppColors.inkTertiary,
                         ),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppColors.borderRadius,
                         ),
                         itemBuilder: (context) => [
                           const PopupMenuItem(
@@ -446,9 +466,9 @@ class _SidebarGenreItem extends ConsumerWidget {
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                Icon(Icons.delete_outline, size: 20, color: AppColors.danger),
                                 SizedBox(width: 12),
-                                Text('削除', style: TextStyle(color: Colors.red)),
+                                Text('削除', style: TextStyle(color: AppColors.danger)),
                               ],
                             ),
                           ),
@@ -469,16 +489,16 @@ class _SidebarGenreItem extends ConsumerWidget {
                       height: 36,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? Colors.grey.shade200
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.zero,
+                            ? AppColors.outline
+                            : AppColors.surfaceMuted,
+                        borderRadius: AppColors.borderRadius,
                       ),
                       child: Icon(
                         Icons.folder_outlined,
                         size: 18,
                         color: isSelected
-                            ? Colors.grey.shade700
-                            : Colors.grey.shade500,
+                            ? AppColors.inkSecondary
+                            : AppColors.inkTertiary,
                       ),
                     ),
                   ),
@@ -498,7 +518,6 @@ class _AddGenreButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -506,7 +525,7 @@ class _AddGenreButton extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _showAddGenreDialog(context, ref),
-          borderRadius: BorderRadius.zero,
+          borderRadius: AppColors.borderRadius,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: EdgeInsets.symmetric(
@@ -515,34 +534,35 @@ class _AddGenreButton extends ConsumerWidget {
             ),
             decoration: BoxDecoration(
               border: Border.all(
-                color: Colors.grey.shade300,
+                color: AppColors.outline,
                 width: 1.0,
               ),
-              borderRadius: BorderRadius.zero,
+              borderRadius: AppColors.borderRadius,
             ),
             child: isOpen
                 ? Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.add_circle_outline,
                         size: 20,
-                        color: Colors.grey.shade700,
+                        color: AppColors.inkSecondary,
                       ),
                       const SizedBox(width: 12),
                       Text(
                         'ジャンルを追加',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey.shade700,
+                          color: AppColors.inkSecondary,
                           fontWeight: FontWeight.normal,
+                          fontSize: 17,
                         ),
                       ),
                     ],
                   )
-                : Center(
+                : const Center(
                     child: Icon(
                       Icons.add_circle_outline,
                       size: 22,
-                      color: Colors.grey.shade600,
+                      color: AppColors.inkSecondary,
                     ),
                   ),
           ),

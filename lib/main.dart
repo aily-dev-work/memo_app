@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
@@ -15,23 +17,49 @@ import 'features/memos/data/memo_repository.dart';
 import 'features/memos/data/memo_repository_impl.dart';
 import 'app/router.dart';
 
+bool get _supportsMobileAds {
+  if (kIsWeb) return false;
+  return defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.android;
+}
+
+Future<Isar> _openIsar(String directory) async {
+  try {
+    return await Isar.open(
+      [
+        GenreSchemaSchema,
+        MemoSchemaSchema,
+      ],
+      directory: directory,
+    );
+  } catch (_) {
+    // スキーマ変更（例: format 追加）で開けない場合は作り直す
+    await Isar.getInstance()?.close(deleteFromDisk: true);
+    return Isar.open(
+      [
+        GenreSchemaSchema,
+        MemoSchemaSchema,
+      ],
+      directory: directory,
+    );
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Google Mobile Ads初期化（kShowAds が true のときのみ）
-  if (kShowAds) {
-    await MobileAds.instance.initialize();
+  // Google Mobile Ads は iOS / Android のみ（macOS ではプラグイン未実装で落ちる）
+  if (kShowAds && _supportsMobileAds) {
+    try {
+      await MobileAds.instance.initialize();
+    } catch (_) {
+      // 広告初期化失敗でもアプリ本体は起動する
+    }
   }
 
   // Isar初期化
   final dir = await getApplicationDocumentsDirectory();
-  final isar = await Isar.open(
-    [
-      GenreSchemaSchema,
-      MemoSchemaSchema,
-    ],
-    directory: dir.path,
-  );
+  final isar = await _openIsar(dir.path);
   
   // 初期データ作成
   final genreRepository = GenreRepository(isar);

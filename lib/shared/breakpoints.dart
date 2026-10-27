@@ -1,7 +1,7 @@
 /// レスポンシブレイアウトのブレークポイント定数
 class Breakpoints {
   /// 2ペイン表示に切り替わる最小幅（ピクセル）
-  static const double twoPaneWidth = 900.0;
+  static const double twoPaneWidth = 800.0;
   
   /// スマホ横向きで2ペイン表示に切り替わる最小幅（ピクセル）
   static const double twoPaneWidthLandscape = 700.0;

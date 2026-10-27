@@ -1,7 +1,7 @@
 name: memo_app
 description: ジャンル→タブ→本文編集のメモ帳アプリ
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.4+14
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

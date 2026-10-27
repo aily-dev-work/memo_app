@@ -1,5 +1,7 @@
 // ignore_for_file: constant_identifier_names
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
+
 // ビルド時に --dart-define で注入する環境設定。
 //
 // 例:
@@ -13,7 +15,10 @@
 
 const String _kFlavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
 
-bool get kIsProd => _kFlavor == 'prod';
+// 安全側の判定:
+// - FLAVOR=prod のときは本番
+// - さらに、FLAVOR指定漏れでも release ビルドは本番扱いにする
+bool get kIsProd => _kFlavor == 'prod' || kReleaseMode;
 
 // 未指定時は空。getAdMobBannerId* でフォールバック。
 const String _kAdMobBannerIdIos = String.fromEnvironment('ADMOB_BANNER_ID_IOS', defaultValue: '');
