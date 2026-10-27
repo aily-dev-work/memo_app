@@ -66,3 +66,7 @@ app.*.map.json
 # Firebase local configuration
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+
+# Generated files
+/android/build/
+/ios/Runner/third_party_headers/
